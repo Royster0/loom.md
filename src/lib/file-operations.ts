@@ -8,6 +8,7 @@ import { state, updateTitle } from "./state";
 import { editor } from "./dom";
 import { setEditorContent } from "./rendering";
 import { updateStatistics } from "./ui";
+import { refreshFileTree } from "./file-tree";
 
 /**
  * Save the current file
@@ -43,10 +44,16 @@ export async function saveFileAs(): Promise<void> {
     });
 
     if (filePath) {
+      const isNewFile = state.currentFile !== filePath;
       await writeTextFile(filePath, state.content);
       state.currentFile = filePath;
       state.isDirty = false;
       updateTitle();
+
+      // Refresh file tree if we saved a new file in the current folder
+      if (isNewFile && state.currentFolder) {
+        await refreshFileTree();
+      }
     }
   } catch (error) {
     console.error("Error saving file:", error);

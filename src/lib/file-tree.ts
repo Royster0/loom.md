@@ -9,6 +9,7 @@ import { fileTree, sidebar, explorerHeader } from "./dom";
 import { state } from "./state";
 import { loadFileContent } from "./file-operations";
 import { reinitializeThemeForFolder } from "./theme";
+import { showContextMenu, initContextMenu } from "./context-menu";
 
 /**
  * Update the explorer header to show the current folder name
@@ -70,6 +71,15 @@ async function loadFileTree(folderPath: string) {
 }
 
 /**
+ * Refresh the file tree (reload current folder)
+ */
+export async function refreshFileTree() {
+  if (state.currentFolder) {
+    await loadFileTree(state.currentFolder);
+  }
+}
+
+/**
  * Render file tree from entries
  * @param entries - Array of file entries
  */
@@ -79,6 +89,15 @@ function renderFileTree(entries: FileEntry[]) {
   entries.forEach((entry) => {
     const treeItem = createTreeItem(entry);
     fileTree.appendChild(treeItem);
+  });
+
+  // Add context menu handler for empty space
+  fileTree.addEventListener("contextmenu", (e) => {
+    // Only trigger if clicking directly on fileTree (not on tree items)
+    if (e.target === fileTree) {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, null, false);
+    }
   });
 }
 
@@ -140,6 +159,13 @@ function createTreeItem(entry: FileEntry, level: number = 0): HTMLElement {
   item.appendChild(name);
 
   container.appendChild(item);
+
+  // Right-click handler for context menu
+  item.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showContextMenu(e.clientX, e.clientY, entry.path, entry.is_dir);
+  });
 
   // Children container for folders
   if (entry.is_dir) {
@@ -221,4 +247,60 @@ export function toggleSidebar() {
   } else {
     sidebar.classList.add("collapsed");
   }
+}
+
+/**
+ * Initialize sidebar resizing functionality
+ */
+export function initSidebarResize() {
+  // Create resize handle
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "sidebar-resize-handle";
+  sidebar.appendChild(resizeHandle);
+
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  resizeHandle.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    resizeHandle.classList.add("resizing");
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+
+    const delta = e.clientX - startX;
+    const newWidth = startWidth + delta;
+
+    // Enforce min and max width
+    const minWidth = 150;
+    const maxWidth = 600;
+    const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+    sidebar.style.width = `${clampedWidth}px`;
+    sidebar.style.minWidth = `${clampedWidth}px`;
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      resizeHandle.classList.remove("resizing");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+  });
+}
+
+/**
+ * Initialize file tree functionality
+ */
+export function initFileTree() {
+  initContextMenu();
+  initSidebarResize();
 }

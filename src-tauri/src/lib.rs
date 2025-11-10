@@ -107,6 +107,50 @@ fn read_file_from_path(path: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
+// Create a new file
+#[tauri::command]
+fn create_file(path: String) -> Result<(), String> {
+    let file_path = PathBuf::from(&path);
+
+    // Check if parent directory exists
+    if let Some(parent) = file_path.parent() {
+        if !parent.exists() {
+            return Err("Parent directory does not exist".to_string());
+        }
+    }
+
+    // Check if file already exists
+    if file_path.exists() {
+        return Err("File already exists".to_string());
+    }
+
+    // Create the file
+    fs::write(&file_path, "")
+        .map_err(|e| format!("Failed to create file: {}", e))
+}
+
+// Create a new folder
+#[tauri::command]
+fn create_folder(path: String) -> Result<(), String> {
+    let dir_path = PathBuf::from(&path);
+
+    // Check if parent directory exists
+    if let Some(parent) = dir_path.parent() {
+        if !parent.exists() {
+            return Err("Parent directory does not exist".to_string());
+        }
+    }
+
+    // Check if folder already exists
+    if dir_path.exists() {
+        return Err("Folder already exists".to_string());
+    }
+
+    // Create the folder
+    fs::create_dir(&dir_path)
+        .map_err(|e| format!("Failed to create folder: {}", e))
+}
+
 // Theme and config commands
 
 /// Initialize the .loom directory structure
@@ -219,6 +263,8 @@ pub fn run() {
             render_markdown_batch,
             read_directory,
             read_file_from_path,
+            create_file,
+            create_folder,
             init_loom_dir,
             get_loom_directory,
             load_config,
