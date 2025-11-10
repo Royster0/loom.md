@@ -442,6 +442,18 @@ editor.addEventListener("blur", () => {
   renderAllLines();
 });
 
+// Helper function to get the first text node, even if wrapped in elements
+function getFirstTextNode(node: Node): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node;
+  }
+  for (let i = 0; i < node.childNodes.length; i++) {
+    const textNode = getFirstTextNode(node.childNodes[i]);
+    if (textNode) return textNode;
+  }
+  return null;
+}
+
 // Helper function to check if a line is inside a math or code block
 function isLineInsideBlock(lineIndex: number, allLines: string[]): boolean {
   let inCodeBlock = false;
@@ -553,9 +565,9 @@ async function handleCursorChange() {
       currentLineDiv.innerHTML = html;
       currentLineDiv.classList.add("editing");
 
-      // Restore cursor position
+      // Restore cursor position (find text node even if wrapped in spans)
       try {
-        const textNode = currentLineDiv.firstChild;
+        const textNode = getFirstTextNode(currentLineDiv);
         if (textNode && textNode.nodeType === Node.TEXT_NODE) {
           const newRange = document.createRange();
           const newSelection = window.getSelection();
