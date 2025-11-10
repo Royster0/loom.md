@@ -48,6 +48,11 @@ export const sidebar = document.getElementById("sidebar") as HTMLDivElement;
 export const fileTree = document.getElementById("file-tree") as HTMLDivElement;
 
 /**
+ * Explorer header element
+ */
+export const explorerHeader = document.getElementById("explorer-header") as HTMLSpanElement;
+
+/**
  * File menu button
  */
 export const fileMenuBtn = document.getElementById("file-menu-btn");
