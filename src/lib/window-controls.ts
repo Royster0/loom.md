@@ -50,6 +50,11 @@ export async function populateThemeSelector() {
  */
 async function handleImportTheme() {
   try {
+    if (!state.currentFolder) {
+      alert("Please open a folder before importing themes.\n\nThemes are stored in the .loom folder of your current project.");
+      return;
+    }
+
     const selected = await open({
       multiple: false,
       filters: [

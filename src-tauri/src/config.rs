@@ -29,27 +29,36 @@ impl Default for AppConfig {
     }
 }
 
-/// Get the path to the .slate directory
-pub fn get_slate_dir() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
-
-    Ok(home_dir.join(".slate"))
+/// Get the path to the .loom directory in the specified folder
+pub fn get_loom_dir(folder_path: Option<String>) -> Result<PathBuf, String> {
+    match folder_path {
+        Some(path) => {
+            let folder = PathBuf::from(path);
+            if !folder.exists() {
+                return Err("Folder does not exist".to_string());
+            }
+            if !folder.is_dir() {
+                return Err("Path is not a directory".to_string());
+            }
+            Ok(folder.join(".loom"))
+        }
+        None => Err("No folder path provided".to_string()),
+    }
 }
 
-/// Initialize the .slate directory structure
-pub fn initialize_slate_dir() -> Result<(), String> {
-    let slate_dir = get_slate_dir()?;
+/// Initialize the .loom directory structure in the specified folder
+pub fn initialize_loom_dir(folder_path: Option<String>) -> Result<(), String> {
+    let loom_dir = get_loom_dir(folder_path)?;
 
-    // Create main .slate directory
-    fs::create_dir_all(&slate_dir)
-        .map_err(|e| format!("Failed to create .slate directory: {}", e))?;
+    // Create main .loom directory
+    fs::create_dir_all(&loom_dir)
+        .map_err(|e| format!("Failed to create .loom directory: {}", e))?;
 
     // Create subdirectories
-    let themes_dir = slate_dir.join("themes");
+    let themes_dir = loom_dir.join("themes");
     let builtin_themes_dir = themes_dir.join("built-in");
     let custom_themes_dir = themes_dir.join("custom");
-    let plugins_dir = slate_dir.join("plugins");
+    let plugins_dir = loom_dir.join("plugins");
 
     fs::create_dir_all(&builtin_themes_dir)
         .map_err(|e| format!("Failed to create themes/built-in directory: {}", e))?;
@@ -59,23 +68,23 @@ pub fn initialize_slate_dir() -> Result<(), String> {
         .map_err(|e| format!("Failed to create plugins directory: {}", e))?;
 
     // Create default config.json if it doesn't exist
-    let config_path = slate_dir.join("config.json");
+    let config_path = loom_dir.join("config.json");
     if !config_path.exists() {
         let default_config = AppConfig::default();
-        save_app_config(&default_config)?;
+        let json = serde_json::to_string_pretty(&default_config)
+            .map_err(|e| format!("Failed to serialize default config: {}", e))?;
+        fs::write(&config_path, json)
+            .map_err(|e| format!("Failed to write config file: {}", e))?;
     }
 
     // Create built-in themes if they don't exist
-    create_builtin_themes()?;
+    create_builtin_themes(&builtin_dir)?;
 
     Ok(())
 }
 
 /// Create built-in theme files
-fn create_builtin_themes() -> Result<(), String> {
-    let slate_dir = get_slate_dir()?;
-    let builtin_dir = slate_dir.join("themes").join("built-in");
-
+fn create_builtin_themes(builtin_dir: &PathBuf) -> Result<(), String> {
     // Dark theme
     let dark_theme_path = builtin_dir.join("dark.json");
     if !dark_theme_path.exists() {
@@ -135,7 +144,7 @@ fn get_default_dark_theme() -> ThemeConfig {
 
     ThemeConfig {
         name: "Dark".to_string(),
-        author: Some("Slate.md".to_string()),
+        author: Some("Loom.md".to_string()),
         version: Some("1.0.0".to_string()),
         variables,
     }
@@ -177,16 +186,16 @@ fn get_default_light_theme() -> ThemeConfig {
 
     ThemeConfig {
         name: "Light".to_string(),
-        author: Some("Slate.md".to_string()),
+        author: Some("Loom.md".to_string()),
         version: Some("1.0.0".to_string()),
         variables,
     }
 }
 
-/// Load application config
-pub fn load_app_config() -> Result<AppConfig, String> {
-    let slate_dir = get_slate_dir()?;
-    let config_path = slate_dir.join("config.json");
+/// Load application config from the specified folder
+pub fn load_app_config(folder_path: Option<String>) -> Result<AppConfig, String> {
+    let loom_dir = get_loom_dir(folder_path)?;
+    let config_path = loom_dir.join("config.json");
 
     if !config_path.exists() {
         return Ok(AppConfig::default());
@@ -199,10 +208,10 @@ pub fn load_app_config() -> Result<AppConfig, String> {
         .map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
-/// Save application config
-pub fn save_app_config(config: &AppConfig) -> Result<(), String> {
-    let slate_dir = get_slate_dir()?;
-    let config_path = slate_dir.join("config.json");
+/// Save application config to the specified folder
+pub fn save_app_config(folder_path: Option<String>, config: &AppConfig) -> Result<(), String> {
+    let loom_dir = get_loom_dir(folder_path)?;
+    let config_path = loom_dir.join("config.json");
 
     let json = serde_json::to_string_pretty(config)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
@@ -211,18 +220,18 @@ pub fn save_app_config(config: &AppConfig) -> Result<(), String> {
         .map_err(|e| format!("Failed to write config file: {}", e))
 }
 
-/// Load a theme by name
-pub fn load_theme(theme_name: &str) -> Result<ThemeConfig, String> {
-    let slate_dir = get_slate_dir()?;
+/// Load a theme by name from the specified folder
+pub fn load_theme(folder_path: Option<String>, theme_name: &str) -> Result<ThemeConfig, String> {
+    let loom_dir = get_loom_dir(folder_path)?;
 
     // Try built-in themes first
-    let builtin_path = slate_dir.join("themes").join("built-in").join(format!("{}.json", theme_name));
+    let builtin_path = loom_dir.join("themes").join("built-in").join(format!("{}.json", theme_name));
     if builtin_path.exists() {
         return load_theme_from_path(&builtin_path);
     }
 
     // Try custom themes
-    let custom_path = slate_dir.join("themes").join("custom").join(format!("{}.json", theme_name));
+    let custom_path = loom_dir.join("themes").join("custom").join(format!("{}.json", theme_name));
     if custom_path.exists() {
         return load_theme_from_path(&custom_path);
     }
@@ -239,13 +248,13 @@ fn load_theme_from_path(path: &PathBuf) -> Result<ThemeConfig, String> {
         .map_err(|e| format!("Failed to parse theme file: {}", e))
 }
 
-/// List all available themes
-pub fn list_themes() -> Result<Vec<String>, String> {
-    let slate_dir = get_slate_dir()?;
+/// List all available themes in the specified folder
+pub fn list_themes(folder_path: Option<String>) -> Result<Vec<String>, String> {
+    let loom_dir = get_loom_dir(folder_path)?;
     let mut themes = Vec::new();
 
     // List built-in themes
-    let builtin_dir = slate_dir.join("themes").join("built-in");
+    let builtin_dir = loom_dir.join("themes").join("built-in");
     if builtin_dir.exists() {
         let entries = fs::read_dir(&builtin_dir)
             .map_err(|e| format!("Failed to read built-in themes directory: {}", e))?;
@@ -263,7 +272,7 @@ pub fn list_themes() -> Result<Vec<String>, String> {
     }
 
     // List custom themes
-    let custom_dir = slate_dir.join("themes").join("custom");
+    let custom_dir = loom_dir.join("themes").join("custom");
     if custom_dir.exists() {
         let entries = fs::read_dir(&custom_dir)
             .map_err(|e| format!("Failed to read custom themes directory: {}", e))?;
@@ -284,8 +293,8 @@ pub fn list_themes() -> Result<Vec<String>, String> {
 }
 
 /// Import a theme from an external path to the custom themes folder
-pub fn import_theme(source_path: String) -> Result<String, String> {
-    let slate_dir = get_slate_dir()?;
+pub fn import_theme(folder_path: Option<String>, source_path: String) -> Result<String, String> {
+    let loom_dir = get_loom_dir(folder_path)?;
     let source = PathBuf::from(&source_path);
 
     if !source.exists() {
@@ -296,7 +305,7 @@ pub fn import_theme(source_path: String) -> Result<String, String> {
     let theme = load_theme_from_path(&source)?;
 
     // Copy to custom themes folder
-    let custom_dir = slate_dir.join("themes").join("custom");
+    let custom_dir = loom_dir.join("themes").join("custom");
     let dest_path = custom_dir.join(format!("{}.json", theme.name.to_lowercase()));
 
     fs::copy(&source, &dest_path)
@@ -306,12 +315,22 @@ pub fn import_theme(source_path: String) -> Result<String, String> {
 }
 
 /// Export a theme to an external path
-pub fn export_theme(theme_name: String, dest_path: String) -> Result<(), String> {
-    let theme = load_theme(&theme_name)?;
+pub fn export_theme(folder_path: Option<String>, theme_name: String, dest_path: String) -> Result<(), String> {
+    let theme = load_theme(folder_path, &theme_name)?;
 
     let json = serde_json::to_string_pretty(&theme)
         .map_err(|e| format!("Failed to serialize theme: {}", e))?;
 
     fs::write(&dest_path, json)
         .map_err(|e| format!("Failed to write theme file: {}", e))
+}
+
+/// Get the default dark theme (for when no folder is open)
+pub fn get_default_dark_theme_config() -> ThemeConfig {
+    get_default_dark_theme()
+}
+
+/// Get the default light theme (for when no folder is open)
+pub fn get_default_light_theme_config() -> ThemeConfig {
+    get_default_light_theme()
 }

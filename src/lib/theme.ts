@@ -11,22 +11,52 @@ import { state } from "./state";
  */
 export async function initializeTheme(): Promise<void> {
   try {
+    // Initialize .loom directory if folder is open
+    if (state.currentFolder) {
+      await invoke("init_loom_dir", { folderPath: state.currentFolder });
+    }
+
     // Load available themes
-    const themes = await invoke<string[]>("get_available_themes");
+    const themes = await invoke<string[]>("get_available_themes", {
+      folderPath: state.currentFolder
+    });
     state.availableThemes = themes;
 
-    // Load current theme from config
-    const config = await invoke<AppConfig>("load_config");
-    state.currentTheme = config.current_theme;
+    // Load current theme from config (or use default)
+    let themeName = "dark";
+    if (state.currentFolder) {
+      try {
+        const config = await invoke<AppConfig>("load_config", {
+          folderPath: state.currentFolder
+        });
+        themeName = config.current_theme;
+      } catch (error) {
+        console.log("No config found, using default theme");
+      }
+    }
+
+    state.currentTheme = themeName;
 
     // Apply the current theme
-    await applyTheme(config.current_theme);
+    await applyTheme(themeName);
   } catch (error) {
     console.error("Failed to initialize theme:", error);
     // Fallback to default dark theme
     state.currentTheme = "dark";
-    state.availableThemes = ["dark"];
+    state.availableThemes = ["dark", "light"];
+    // Apply default dark theme
+    const defaultTheme = await invoke<ThemeConfig>("get_current_theme", {
+      folderPath: null
+    });
+    applyThemeVariables(defaultTheme);
   }
+}
+
+/**
+ * Re-initialize theme system when folder changes
+ */
+export async function reinitializeThemeForFolder(): Promise<void> {
+  await initializeTheme();
 }
 
 /**
@@ -34,7 +64,10 @@ export async function initializeTheme(): Promise<void> {
  */
 export async function applyTheme(themeName: string): Promise<void> {
   try {
-    const theme = await invoke<ThemeConfig>("get_theme", { themeName });
+    const theme = await invoke<ThemeConfig>("get_theme", {
+      folderPath: state.currentFolder,
+      themeName
+    });
     applyThemeVariables(theme);
     state.currentTheme = themeName;
   } catch (error) {
@@ -63,10 +96,16 @@ export async function switchTheme(themeName: string): Promise<void> {
     // Apply the theme
     await applyTheme(themeName);
 
-    // Save the preference
-    await invoke("set_theme", { themeName });
-
-    console.log(`Switched to theme: ${themeName}`);
+    // Save the preference only if folder is open
+    if (state.currentFolder) {
+      await invoke("set_theme", {
+        folderPath: state.currentFolder,
+        themeName
+      });
+      console.log(`Switched to theme: ${themeName} (saved to .loom folder)`);
+    } else {
+      console.log(`Switched to theme: ${themeName} (not persisted - no folder open)`);
+    }
   } catch (error) {
     console.error(`Failed to switch theme to '${themeName}':`, error);
     throw error;
@@ -78,10 +117,12 @@ export async function switchTheme(themeName: string): Promise<void> {
  */
 export async function getAvailableThemes(): Promise<string[]> {
   try {
-    return await invoke<string[]>("get_available_themes");
+    return await invoke<string[]>("get_available_themes", {
+      folderPath: state.currentFolder
+    });
   } catch (error) {
     console.error("Failed to get available themes:", error);
-    return [];
+    return ["dark", "light"]; // Fallback to built-in themes
   }
 }
 
@@ -90,7 +131,14 @@ export async function getAvailableThemes(): Promise<string[]> {
  */
 export async function importTheme(sourcePath: string): Promise<string> {
   try {
-    const themeName = await invoke<string>("import_custom_theme", { sourcePath });
+    if (!state.currentFolder) {
+      throw new Error("Please open a folder before importing themes");
+    }
+
+    const themeName = await invoke<string>("import_custom_theme", {
+      folderPath: state.currentFolder,
+      sourcePath
+    });
 
     // Refresh available themes
     const themes = await getAvailableThemes();
@@ -108,7 +156,11 @@ export async function importTheme(sourcePath: string): Promise<string> {
  */
 export async function exportTheme(themeName: string, destPath: string): Promise<void> {
   try {
-    await invoke("export_custom_theme", { themeName, destPath });
+    await invoke("export_custom_theme", {
+      folderPath: state.currentFolder,
+      themeName,
+      destPath
+    });
   } catch (error) {
     console.error("Failed to export theme:", error);
     throw error;
@@ -120,7 +172,9 @@ export async function exportTheme(themeName: string, destPath: string): Promise<
  */
 export async function getCurrentTheme(): Promise<ThemeConfig> {
   try {
-    return await invoke<ThemeConfig>("get_current_theme");
+    return await invoke<ThemeConfig>("get_current_theme", {
+      folderPath: state.currentFolder
+    });
   } catch (error) {
     console.error("Failed to get current theme:", error);
     throw error;
@@ -128,13 +182,18 @@ export async function getCurrentTheme(): Promise<ThemeConfig> {
 }
 
 /**
- * Get the path to the .slate directory
+ * Get the path to the .loom directory
  */
-export async function getSlateDirectory(): Promise<string> {
+export async function getLoomDirectory(): Promise<string> {
   try {
-    return await invoke<string>("get_slate_directory");
+    if (!state.currentFolder) {
+      throw new Error("No folder is currently open");
+    }
+    return await invoke<string>("get_loom_directory", {
+      folderPath: state.currentFolder
+    });
   } catch (error) {
-    console.error("Failed to get .slate directory:", error);
+    console.error("Failed to get .loom directory:", error);
     throw error;
   }
 }
