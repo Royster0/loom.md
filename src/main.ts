@@ -486,12 +486,16 @@ editor.addEventListener("keydown", async (e) => {
 
     // Update current line with text before cursor
     currentLine.setAttribute("data-raw", beforeCursor);
+    currentLine.innerHTML = renderMarkdownLine(beforeCursor, false);
+    currentLine.classList.remove("editing");
 
     // Create new line with text after cursor
     const newLine = document.createElement("div");
     newLine.className = "editor-line";
     newLine.setAttribute("data-raw", afterCursor);
     newLine.setAttribute("data-line", String(currentLineNum + 1));
+    newLine.innerHTML = afterCursor || "<br>";
+    newLine.classList.add("editing");
 
     // Insert after current line
     if (currentLine.nextSibling) {
@@ -590,6 +594,8 @@ editor.addEventListener("keydown", async (e) => {
 
       // Update previous line with merged text
       prevLine.setAttribute("data-raw", mergedText);
+      prevLine.innerHTML = renderMarkdownLine(mergedText, true);
+      prevLine.classList.add("editing");
 
       // Remove current line
       editor.removeChild(currentLine);
@@ -684,6 +690,8 @@ editor.addEventListener("keydown", async (e) => {
 
       // Update current line with merged text
       currentLine.setAttribute("data-raw", mergedText);
+      currentLine.innerHTML = renderMarkdownLine(mergedText, true);
+      currentLine.classList.add("editing");
 
       // Remove next line
       editor.removeChild(nextLine);
