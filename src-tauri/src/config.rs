@@ -78,7 +78,7 @@ pub fn initialize_loom_dir(folder_path: Option<String>) -> Result<(), String> {
     }
 
     // Create built-in themes if they don't exist
-    create_builtin_themes(&builtin_dir)?;
+    create_builtin_themes(&builtin_themes_dir)?;
 
     Ok(())
 }
