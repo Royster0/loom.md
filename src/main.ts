@@ -188,18 +188,21 @@ function getCurrentLineNumber(): number {
   return 0;
 }
 
-// Get plain text content from editor
-function getEditorContent(): string {
+// Get all raw line strings from editor
+function getAllLines(): string[] {
   const lines: string[] = [];
   for (let i = 0; i < editor.childNodes.length; i++) {
     const node = editor.childNodes[i];
     if (node.nodeName === "DIV") {
-      lines.push(
-        (node as HTMLElement).getAttribute("data-raw") || node.textContent || ""
-      );
+      lines.push((node as HTMLElement).getAttribute("data-raw") || "");
     }
   }
-  return lines.join("\n");
+  return lines;
+}
+
+// Get plain text content from editor
+function getEditorContent(): string {
+  return getAllLines().join("\n");
 }
 
 // Set editor content from plain text
@@ -229,6 +232,7 @@ function setEditorContent(text: string) {
 
 // Render all lines
 function renderAllLines() {
+  const allLines = getAllLines();
   for (let i = 0; i < editor.childNodes.length; i++) {
     const lineDiv = editor.childNodes[i] as HTMLElement;
     const rawText = lineDiv.getAttribute("data-raw") || "";
@@ -386,6 +390,9 @@ function handleCursorChange() {
   if (lineNum !== state.currentLine) {
     const oldLine = state.currentLine;
     state.currentLine = lineNum;
+
+    // Get all lines for code block detection
+    const allLines = getAllLines();
 
     // Re-render the old line if it exists
     if (oldLine !== null && oldLine < editor.childNodes.length) {
