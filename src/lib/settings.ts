@@ -349,6 +349,19 @@ async function loadSettings(): Promise<void> {
 }
 
 /**
+ * Reinitialize settings for a newly opened folder
+ * Call this when a folder is opened to load its specific settings
+ */
+export async function reinitializeSettingsForFolder(): Promise<void> {
+  await loadSettings();
+  applyStatusBarVisibility();
+  // Refresh keybinds list if settings modal is open
+  if (!settingsModal.classList.contains("hidden")) {
+    populateKeybindsList();
+  }
+}
+
+/**
  * Save settings to backend
  */
 export async function saveSettings(): Promise<void> {
@@ -468,6 +481,14 @@ export function openSettings(): void {
 
   // Update status bar toggle
   settingsStatusBarToggle.checked = state.statusBarVisible;
+
+  // Update delete confirmation toggles
+  if (settingsConfirmFileDeleteToggle) {
+    settingsConfirmFileDeleteToggle.checked = state.confirmFileDelete;
+  }
+  if (settingsConfirmFolderDeleteToggle) {
+    settingsConfirmFolderDeleteToggle.checked = state.confirmFolderDelete;
+  }
 
   // Refresh keybinds list
   populateKeybindsList();

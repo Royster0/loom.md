@@ -9,6 +9,7 @@ import { fileTree, sidebar, explorerHeader } from "./dom";
 import { state } from "./state";
 import { loadFileContent } from "./file-operations";
 import { reinitializeThemeForFolder } from "./theme";
+import { reinitializeSettingsForFolder } from "./settings";
 import { showContextMenu, initContextMenu } from "./context-menu";
 
 /**
@@ -40,6 +41,8 @@ export async function openFolder() {
       await loadFileTree(selected);
       // Reinitialize theme system for the new folder
       await reinitializeThemeForFolder();
+      // Reinitialize settings for the new folder
+      await reinitializeSettingsForFolder();
     }
   } catch (error) {
     console.error("Error opening folder:", error);
