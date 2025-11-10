@@ -225,15 +225,6 @@ async function setEditorContent(text: string) {
   editor.appendChild(fragment);
 }
 
-// Update a specific line (currently unused, but kept for potential future use)
-// function updateLine(lineIndex: number, rawText: string, isEditing: boolean) {
-//   const lineDiv = editor.childNodes[lineIndex] as HTMLElement;
-//   if (lineDiv) {
-//     lineDiv.setAttribute("data-raw", rawText);
-//     lineDiv.innerHTML = renderMarkdownLine(rawText, isEditing);
-//   }
-// }
-
 // Render all lines
 async function renderAllLines() {
   const allLines = getAllLines();
@@ -265,35 +256,6 @@ async function renderAllLines() {
     }
   }
 }
-
-// Save cursor position (currently unused, kept for reference)
-// function saveCursorPosition() {
-//   const selection = window.getSelection();
-//   if (!selection || selection.rangeCount === 0) return null;
-//
-//   const range = selection.getRangeAt(0);
-//   return {
-//     startContainer: range.startContainer,
-//     startOffset: range.startOffset,
-//   };
-// }
-//
-// // Restore cursor position
-// function restoreCursorPosition(position: any) {
-//   if (!position) return;
-//
-//   const selection = window.getSelection();
-//   const range = document.createRange();
-//
-//   try {
-//     range.setStart(position.startContainer, position.startOffset);
-//     range.collapse(true);
-//     selection?.removeAllRanges();
-//     selection?.addRange(range);
-//   } catch (e) {
-//     // Cursor position no longer valid
-//   }
-// }
 
 // Handle input
 editor.addEventListener("input", async () => {

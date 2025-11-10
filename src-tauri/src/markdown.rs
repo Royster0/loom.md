@@ -1,6 +1,5 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use rayon::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineRenderResult {
