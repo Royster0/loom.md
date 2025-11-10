@@ -142,8 +142,7 @@ body {
 }
 
 .editor-line.editing {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  color: var(--text-secondary);
+  /* Keep styling visible while editing - don't override font or color */
 }
 
 /* Headings */
@@ -233,6 +232,35 @@ code {
   font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.9em;
   border: 1px solid var(--border-color);
+}
+
+/* Code blocks */
+.code-block-start,
+.code-block-end {
+  display: none; /* Hide the ``` markers when not editing */
+  color: var(--text-secondary);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+}
+
+/* Show code block markers when editing */
+.editing .code-block-start,
+.editing .code-block-end {
+  display: inline;
+}
+
+.code-block-line {
+  display: block;
+  background-color: var(--code-bg);
+  color: var(--code-color);
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
 }
 
 a {
