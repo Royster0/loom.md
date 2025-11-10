@@ -121,8 +121,24 @@ async function renderMarkdownBatch(requests: RenderRequest[]): Promise<LineRende
 }
 
 // Post-process HTML to render LaTeX (frontend-only since we use KaTeX)
-// Optimized: only process if line contains LaTeX markers
+// Optimized: only process if line contains LaTeX markers or is a math block
 function renderLatexInHtml(html: string): string {
+  // Check for math block lines and render them with KaTeX in display mode
+  if (html.includes('class="math-block-line"')) {
+    return html.replace(/<span class="math-block-line">([^<]+)<\/span>/g, (match, content) => {
+      try {
+        const latex = content.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+        const rendered = katex.renderToString(latex.trim(), {
+          displayMode: true,
+          throwOnError: false,
+        });
+        return `<span class="math-block-line">${rendered}</span>`;
+      } catch (e) {
+        return match;
+      }
+    });
+  }
+
   // Quick check: if no $ symbol, skip LaTeX processing entirely
   if (!html.includes('$')) {
     return html;
