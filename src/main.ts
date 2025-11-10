@@ -10,6 +10,8 @@ interface EditorState {
   isDirty: boolean;
   editMode: boolean;
   currentLine: number | null;
+  currentFolder: string | null;
+  sidebarVisible: boolean;
 }
 
 const state: EditorState = {
@@ -18,11 +20,20 @@ const state: EditorState = {
   isDirty: false,
   editMode: false,
   currentLine: null,
+  currentFolder: null,
+  sidebarVisible: true,
 };
+
+// File tree types
+interface FileEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  children?: FileEntry[];
+}
 
 // DOM elements
 const editor = document.getElementById("editor") as HTMLDivElement;
-const fileNameDisplay = document.getElementById("file-name") as HTMLSpanElement;
 const wordCountDisplay = document.getElementById(
   "word-count"
 ) as HTMLSpanElement;
@@ -35,6 +46,8 @@ const cursorPositionDisplay = document.getElementById(
 const editModeToggle = document.getElementById(
   "edit-mode-toggle"
 ) as HTMLButtonElement;
+const sidebar = document.getElementById("sidebar") as HTMLDivElement;
+const fileTree = document.getElementById("file-tree") as HTMLDivElement;
 
 // Types for Rust backend communication
 interface RenderRequest {
@@ -93,6 +106,13 @@ async function renderMarkdownLine(line: string, isEditing: boolean, lineIndex?: 
 
   try {
     const result = await invoke<LineRenderResult>("render_markdown", { request });
+
+    // Only render LaTeX when NOT editing to preserve the original $ markers
+    // This prevents corruption when clicking into or navigating through LaTeX equations
+    if (isEditing) {
+      return result.html;
+    }
+
     // Post-process the HTML to add LaTeX rendering
     return renderLatexInHtml(result.html);
   } catch (error) {
@@ -106,10 +126,10 @@ async function renderMarkdownLine(line: string, isEditing: boolean, lineIndex?: 
 async function renderMarkdownBatch(requests: RenderRequest[]): Promise<LineRenderResult[]> {
   try {
     const results = await invoke<LineRenderResult[]>("render_markdown_batch", { requests });
-    // Post-process all results to add LaTeX rendering
-    return results.map((result: LineRenderResult) => ({
+    // Post-process all results to add LaTeX rendering (only for non-editing lines)
+    return results.map((result: LineRenderResult, index: number) => ({
       ...result,
-      html: renderLatexInHtml(result.html)
+      html: requests[index].is_editing ? result.html : renderLatexInHtml(result.html)
     }));
   } catch (error) {
     console.error("Error batch rendering markdown:", error);
@@ -435,6 +455,53 @@ editor.addEventListener("blur", () => {
   renderAllLines();
 });
 
+// Helper function to get the first text node, even if wrapped in elements
+function getFirstTextNode(node: Node): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node;
+  }
+  for (let i = 0; i < node.childNodes.length; i++) {
+    const textNode = getFirstTextNode(node.childNodes[i]);
+    if (textNode) return textNode;
+  }
+  return null;
+}
+
+// Helper function to check if a line is inside a math or code block
+function isLineInsideBlock(lineIndex: number, allLines: string[]): boolean {
+  let inCodeBlock = false;
+  let inMathBlock = false;
+
+  // Scan from the beginning to the current line to determine block state
+  for (let i = 0; i <= lineIndex; i++) {
+    const line = allLines[i];
+    const trimmed = line.trim();
+
+    // Check for code block delimiters
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      // If this is the current line and it's a delimiter, it's safe (it's the boundary)
+      if (i === lineIndex) {
+        return false;
+      }
+      continue;
+    }
+
+    // Check for math block delimiters
+    if (trimmed === '$$') {
+      inMathBlock = !inMathBlock;
+      // If this is the current line and it's a delimiter, it's safe (it's the boundary)
+      if (i === lineIndex) {
+        return false;
+      }
+      continue;
+    }
+  }
+
+  // Return true if we're inside either type of block
+  return inCodeBlock || inMathBlock;
+}
+
 async function handleCursorChange() {
   // If there's an active selection (e.g., from Ctrl+A), don't interfere with it
   const selection = window.getSelection();
@@ -457,14 +524,34 @@ async function handleCursorChange() {
     if (oldLine !== null && oldLine < editor.childNodes.length) {
       const oldLineDiv = editor.childNodes[oldLine] as HTMLElement;
       if (oldLineDiv) {
-        // IMPORTANT: Update data-raw with the current text content before re-rendering
-        // This ensures any edits made to the line are preserved
-        const currentText = oldLineDiv.textContent || "";
-        oldLineDiv.setAttribute("data-raw", currentText);
-        // Update allLines to reflect the change
-        allLines[oldLine] = currentText;
+        // Only update data-raw if the line was actually being edited AND it's safe to do so
+        // Don't update for special block types that might have complex HTML rendering
+        if (oldLineDiv.classList.contains("editing")) {
+          const innerHTML = oldLineDiv.innerHTML;
+          // Check if this is a special block type by examining the HTML
+          const hasSpecialClass = innerHTML.includes('code-block-line-editing') ||
+                                  innerHTML.includes('math-block-line-editing') ||
+                                  innerHTML.includes('math-block-line') ||
+                                  innerHTML.includes('class="math-block-start"') ||
+                                  innerHTML.includes('class="math-block-end"') ||
+                                  innerHTML.includes('class="code-block-start"') ||
+                                  innerHTML.includes('class="code-block-end"');
 
-        const html = await renderMarkdownLine(currentText, false, oldLine, allLines);
+          // Also check if the line is inside a block by scanning delimiters
+          const insideBlock = isLineInsideBlock(oldLine, allLines);
+
+          const isSpecialBlock = hasSpecialClass || insideBlock;
+
+          if (!isSpecialBlock) {
+            const currentText = oldLineDiv.textContent || "";
+            oldLineDiv.setAttribute("data-raw", currentText);
+            // Update allLines to reflect the change
+            allLines[oldLine] = currentText;
+          }
+        }
+
+        const rawText = oldLineDiv.getAttribute("data-raw") || "";
+        const html = await renderMarkdownLine(rawText, false, oldLine, allLines);
         oldLineDiv.innerHTML = html;
         oldLineDiv.classList.remove("editing");
       }
@@ -491,21 +578,29 @@ async function handleCursorChange() {
       currentLineDiv.innerHTML = html;
       currentLineDiv.classList.add("editing");
 
-      // Restore cursor position
-      try {
-        const textNode = currentLineDiv.firstChild;
-        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-          const newRange = document.createRange();
-          const newSelection = window.getSelection();
-          const offset = Math.min(cursorOffset, textNode.textContent?.length || 0);
-          newRange.setStart(textNode, offset);
-          newRange.collapse(true);
-          newSelection?.removeAllRanges();
-          newSelection?.addRange(newRange);
+      // Use requestAnimationFrame to ensure DOM layout is complete before cursor restoration
+      requestAnimationFrame(() => {
+        // Restore cursor position (find text node even if wrapped in spans)
+        try {
+          const textNode = getFirstTextNode(currentLineDiv);
+          if (textNode && textNode.nodeType === Node.TEXT_NODE && textNode.textContent) {
+            const newRange = document.createRange();
+            const newSelection = window.getSelection();
+            const offset = Math.min(cursorOffset, textNode.textContent.length);
+            newRange.setStart(textNode, offset);
+            newRange.collapse(true);
+            newSelection?.removeAllRanges();
+            newSelection?.addRange(newRange);
+          } else {
+            // No text node found or it's empty, ensure editor still has focus
+            editor.focus();
+          }
+        } catch (e) {
+          // Cursor restoration failed, ensure editor maintains focus
+          console.error("Cursor restoration failed:", e);
+          editor.focus();
         }
-      } catch (e) {
-        // Cursor restoration failed, cursor will be at start
-      }
+      });
     }
   }
 
@@ -862,7 +957,7 @@ function updateTitle(): void {
   const fileName = state.currentFile
     ? state.currentFile.split(/[\\/]/).pop() || "Untitled.md"
     : "Untitled.md";
-  fileNameDisplay.textContent = state.isDirty ? `${fileName} •` : fileName;
+  document.title = state.isDirty ? `${fileName} • - Markdown Editor` : `${fileName} - Markdown Editor`;
 }
 
 // Edit mode toggle
@@ -876,6 +971,216 @@ editModeToggle.addEventListener("click", () => {
     renderAllLines();
   }
 });
+
+// ============================================================================
+// File Tree Functions
+// ============================================================================
+
+// Open folder dialog and load file tree
+async function openFolder() {
+  try {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+    });
+
+    if (selected && typeof selected === "string") {
+      state.currentFolder = selected;
+      await loadFileTree(selected);
+    }
+  } catch (error) {
+    console.error("Error opening folder:", error);
+  }
+}
+
+// Load and render file tree
+async function loadFileTree(folderPath: string) {
+  try {
+    const entries = await invoke<FileEntry[]>("read_directory", { path: folderPath });
+    renderFileTree(entries);
+  } catch (error) {
+    console.error("Error loading file tree:", error);
+    fileTree.innerHTML = `
+      <div class="empty-state">
+        <p>Error loading folder</p>
+        <button id="open-folder-sidebar-retry" class="open-folder-btn">Try Again</button>
+      </div>
+    `;
+    document.getElementById("open-folder-sidebar-retry")?.addEventListener("click", openFolder);
+  }
+}
+
+// Render file tree from entries
+function renderFileTree(entries: FileEntry[]) {
+  fileTree.innerHTML = "";
+
+  entries.forEach(entry => {
+    const treeItem = createTreeItem(entry);
+    fileTree.appendChild(treeItem);
+  });
+}
+
+// Create a tree item element
+function createTreeItem(entry: FileEntry, level: number = 0): HTMLElement {
+  const container = document.createElement("div");
+
+  const item = document.createElement("div");
+  item.className = "tree-item";
+  item.style.paddingLeft = `${level * 16 + 8}px`;
+  item.setAttribute("data-path", entry.path);
+  item.setAttribute("data-is-dir", entry.is_dir.toString());
+
+  // Arrow for folders
+  if (entry.is_dir) {
+    const arrow = document.createElement("span");
+    arrow.className = "tree-item-arrow";
+    arrow.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 4 10 8 6 12"></polyline>
+      </svg>
+    `;
+    item.appendChild(arrow);
+  } else {
+    // Empty space for files to align with folders
+    const spacer = document.createElement("span");
+    spacer.className = "tree-item-arrow";
+    item.appendChild(spacer);
+  }
+
+  // Icon
+  const icon = document.createElement("span");
+  icon.className = "tree-item-icon";
+  if (entry.is_dir) {
+    icon.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M2 3h4l1 2h7v9H2z"></path>
+      </svg>
+    `;
+  } else {
+    icon.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 1h7l3 3v10H3z"></path>
+        <polyline points="10 1 10 4 13 4"></polyline>
+      </svg>
+    `;
+  }
+  item.appendChild(icon);
+
+  // Name
+  const name = document.createElement("span");
+  name.className = "tree-item-name";
+  name.textContent = entry.name;
+  item.appendChild(name);
+
+  container.appendChild(item);
+
+  // Children container for folders
+  if (entry.is_dir) {
+    const childrenContainer = document.createElement("div");
+    childrenContainer.className = "tree-children collapsed";
+    container.appendChild(childrenContainer);
+
+    // Click handler for folders
+    item.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await toggleFolder(item, childrenContainer, entry, level);
+    });
+  } else {
+    // Click handler for files
+    item.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await openFileFromPath(entry.path);
+
+      // Update selection
+      document.querySelectorAll(".tree-item").forEach(el => el.classList.remove("selected"));
+      item.classList.add("selected");
+    });
+  }
+
+  return container;
+}
+
+// Toggle folder expand/collapse
+async function toggleFolder(item: HTMLElement, childrenContainer: HTMLElement, entry: FileEntry, level: number) {
+  const arrow = item.querySelector(".tree-item-arrow");
+  const isCollapsed = childrenContainer.classList.contains("collapsed");
+
+  if (isCollapsed) {
+    // Expand folder
+    childrenContainer.classList.remove("collapsed");
+    arrow?.classList.add("expanded");
+
+    // Load children if not already loaded
+    if (childrenContainer.children.length === 0) {
+      try {
+        const children = await invoke<FileEntry[]>("read_directory", { path: entry.path });
+        children.forEach(childEntry => {
+          const childItem = createTreeItem(childEntry, level + 1);
+          childrenContainer.appendChild(childItem);
+        });
+      } catch (error) {
+        console.error("Error loading folder contents:", error);
+      }
+    }
+  } else {
+    // Collapse folder
+    childrenContainer.classList.add("collapsed");
+    arrow?.classList.remove("expanded");
+  }
+}
+
+// Open file from path
+async function openFileFromPath(filePath: string) {
+  try {
+    const content = await invoke<string>("read_file_from_path", { path: filePath });
+
+    // Completely reset state
+    state.editMode = false;
+    state.currentLine = null;
+
+    // Remove focus from editor
+    editor.blur();
+
+    // Clear editor completely
+    editor.innerHTML = "";
+
+    // Set content
+    await setEditorContent(content);
+    state.content = content;
+    state.currentFile = filePath;
+    state.isDirty = false;
+
+    // Update UI
+    updateStatistics(content);
+    updateTitle();
+  } catch (error) {
+    console.error("Error opening file:", error);
+    alert("Failed to open file");
+  }
+}
+
+// Toggle sidebar visibility
+function toggleSidebar() {
+  state.sidebarVisible = !state.sidebarVisible;
+  if (state.sidebarVisible) {
+    sidebar.classList.remove("collapsed");
+  } else {
+    sidebar.classList.add("collapsed");
+  }
+}
+
+// ============================================================================
+// Button Event Listeners
+// ============================================================================
+
+// Toggle sidebar
+document.getElementById("toggle-sidebar")?.addEventListener("click", toggleSidebar);
+
+// Open folder (toolbar button)
+document.getElementById("open-folder")?.addEventListener("click", openFolder);
+
+// Open folder (sidebar button)
+document.getElementById("open-folder-sidebar")?.addEventListener("click", openFolder);
 
 // New file
 document.getElementById("new-file")?.addEventListener("click", async () => {

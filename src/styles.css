@@ -105,10 +105,145 @@ body {
   stroke: var(--text-primary);
 }
 
-.file-name {
-  font-weight: 500;
-  font-size: 14px;
+/* Main Container (holds sidebar and editor) */
+.main-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px;
+  min-width: 250px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.3s ease, min-width 0.3s ease, border-color 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right-color: transparent;
+}
+
+.sidebar-header {
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* File Tree */
+.file-tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+}
+
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-state p {
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.open-folder-btn {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+
+.open-folder-btn:hover {
+  background-color: var(--accent-hover);
+}
+
+/* File Tree Items */
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 4px 0;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
   color: var(--text-primary);
+  font-size: 13px;
+}
+
+.tree-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.tree-item.selected {
+  background-color: var(--bg-tertiary);
+  color: var(--accent-color);
+}
+
+.tree-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.tree-item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tree-item-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 2px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+  color: var(--text-secondary);
+}
+
+.tree-item-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tree-item-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.tree-children {
+  padding-left: 16px;
+}
+
+.tree-children.collapsed {
+  display: none;
 }
 
 /* Editor Container */
@@ -143,6 +278,22 @@ body {
 
 .editor-line.editing {
   /* Keep styling visible while editing - don't override font or color */
+}
+
+/* Remove backgrounds from code/spans when line is being edited */
+.editor-line.editing code,
+.editor-line.editing .code-block-line,
+.editor-line.editing .math-block-line {
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline;
+}
+
+/* Math block editing needs display: block to prevent layout issues */
+.editor-line.editing .math-block-line-editing {
+  background: none;
+  border: none;
 }
 
 /* Headings */
@@ -265,6 +416,18 @@ code {
   overflow-x: auto;
 }
 
+/* Code block styling when editing (uses span instead of code element) */
+.code-block-line-editing {
+  display: inline;
+  color: var(--code-color);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  background: none;
+}
+
 /* Math blocks */
 .math-block-start,
 .math-block-end {
@@ -289,6 +452,18 @@ code {
   padding: 0.2em 0;
 }
 
+/* Math block styling when editing (uses span wrapper for consistent structure) */
+.math-block-line-editing {
+  display: block;
+  color: var(--h3-color);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 1em;
+  line-height: 1.5;
+  white-space: pre;
+  background: none;
+  padding: 0.2em 0;
+}
+
 a {
   color: var(--link-color);
   text-decoration: none;
@@ -304,6 +479,10 @@ a:hover {
 .list-item {
   display: block;
   margin: 0.3em 0;
+}
+
+.editing .list-item {
+  white-space: pre; /* Preserve leading spaces in editing mode */
 }
 
 .list-marker {
