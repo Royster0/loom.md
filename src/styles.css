@@ -8,7 +8,7 @@
   --accent-color: #007acc;
   --accent-hover: #0098ff;
   --titlebar-height: 32px;
-  --toolbar-height: 50px;
+  --toolbar-height: 36px;
   --statusbar-height: 28px;
 
   /* Heading colors */
@@ -242,7 +242,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 12px;
   flex-shrink: 0;
 }
 
@@ -264,7 +264,7 @@ body {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-primary);
-  padding: 8px 12px;
+  padding: 6px 10px;
   cursor: pointer;
   border-radius: 4px;
   display: flex;
@@ -430,9 +430,10 @@ body {
 /* Editor Container */
 .editor-container {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background-color: var(--bg-primary);
-  cursor: text;
 }
 
 /* Editor */
@@ -448,6 +449,9 @@ body {
   font-size: 16px;
   line-height: 1.7;
   color: var(--text-primary);
+  flex: 1;
+  overflow-y: auto;
+  cursor: text;
 }
 
 .editor-line {
