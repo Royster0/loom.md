@@ -1,5 +1,10 @@
 mod markdown;
+mod config;
+
 use markdown::{render_markdown_line, LineRenderResult, RenderRequest};
+use config::{ThemeConfig, AppConfig, initialize_loom_dir, load_app_config, save_app_config,
+             load_theme, list_themes, import_theme, export_theme, get_loom_dir,
+             get_default_dark_theme_config, get_default_light_theme_config};
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -102,6 +107,95 @@ fn read_file_from_path(path: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
+// Theme and config commands
+
+/// Initialize the .loom directory structure
+#[tauri::command]
+fn init_loom_dir(folder_path: Option<String>) -> Result<(), String> {
+    initialize_loom_dir(folder_path)
+}
+
+/// Get the path to the .loom directory
+#[tauri::command]
+fn get_loom_directory(folder_path: Option<String>) -> Result<String, String> {
+    get_loom_dir(folder_path).map(|p| p.to_string_lossy().to_string())
+}
+
+/// Load application configuration
+#[tauri::command]
+fn load_config(folder_path: Option<String>) -> Result<AppConfig, String> {
+    load_app_config(folder_path)
+}
+
+/// Save application configuration
+#[tauri::command]
+fn save_config(folder_path: Option<String>, config: AppConfig) -> Result<(), String> {
+    save_app_config(folder_path, &config)
+}
+
+/// Set the current theme
+#[tauri::command]
+fn set_theme(folder_path: Option<String>, theme_name: String) -> Result<(), String> {
+    let mut config = load_app_config(folder_path.clone())?;
+    config.current_theme = theme_name;
+    save_app_config(folder_path, &config)
+}
+
+/// Get the current theme configuration
+#[tauri::command]
+fn get_current_theme(folder_path: Option<String>) -> Result<ThemeConfig, String> {
+    match folder_path.clone() {
+        Some(_) => {
+            let config = load_app_config(folder_path.clone())?;
+            load_theme(folder_path, &config.current_theme)
+        }
+        None => {
+            // Return default dark theme when no folder is open
+            Ok(get_default_dark_theme_config())
+        }
+    }
+}
+
+/// Get a theme by name
+#[tauri::command]
+fn get_theme(folder_path: Option<String>, theme_name: String) -> Result<ThemeConfig, String> {
+    match folder_path.clone() {
+        Some(_) => load_theme(folder_path, &theme_name),
+        None => {
+            // Return built-in themes when no folder is open
+            match theme_name.as_str() {
+                "dark" => Ok(get_default_dark_theme_config()),
+                "light" => Ok(get_default_light_theme_config()),
+                _ => Err("Theme not available without an open folder".to_string()),
+            }
+        }
+    }
+}
+
+/// List all available themes
+#[tauri::command]
+fn get_available_themes(folder_path: Option<String>) -> Result<Vec<String>, String> {
+    match folder_path {
+        Some(_) => list_themes(folder_path),
+        None => {
+            // Return only built-in themes when no folder is open
+            Ok(vec!["dark".to_string(), "light".to_string()])
+        }
+    }
+}
+
+/// Import a theme from an external file
+#[tauri::command]
+fn import_custom_theme(folder_path: Option<String>, source_path: String) -> Result<String, String> {
+    import_theme(folder_path, source_path)
+}
+
+/// Export a theme to an external file
+#[tauri::command]
+fn export_custom_theme(folder_path: Option<String>, theme_name: String, dest_path: String) -> Result<(), String> {
+    export_theme(folder_path, theme_name, dest_path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -113,6 +207,16 @@ pub fn run() {
             render_markdown_batch,
             read_directory,
             read_file_from_path,
+            init_loom_dir,
+            get_loom_directory,
+            load_config,
+            save_config,
+            set_theme,
+            get_current_theme,
+            get_theme,
+            get_available_themes,
+            import_custom_theme,
+            export_custom_theme,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

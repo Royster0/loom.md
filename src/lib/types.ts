@@ -20,6 +20,10 @@ export interface EditorState {
   currentFolder: string | null;
   /** Whether sidebar is visible */
   sidebarVisible: boolean;
+  /** Current theme name */
+  currentTheme: string;
+  /** Available theme names */
+  availableThemes: string[];
 }
 
 /**
@@ -48,4 +52,22 @@ export interface RenderRequest {
 export interface LineRenderResult {
   html: string;
   is_code_block_boundary: boolean;
+}
+
+/**
+ * Theme configuration
+ */
+export interface ThemeConfig {
+  name: string;
+  author?: string;
+  version?: string;
+  variables: Record<string, string>;
+}
+
+/**
+ * Application configuration
+ */
+export interface AppConfig {
+  current_theme: string;
+  custom_settings?: Record<string, unknown>;
 }

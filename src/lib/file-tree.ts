@@ -8,6 +8,7 @@ import type { FileEntry } from "./types";
 import { fileTree, sidebar, explorerHeader } from "./dom";
 import { state } from "./state";
 import { loadFileContent } from "./file-operations";
+import { reinitializeThemeForFolder } from "./theme";
 
 /**
  * Update the explorer header to show the current folder name
@@ -36,6 +37,8 @@ export async function openFolder() {
       state.currentFolder = selected;
       updateExplorerHeader();
       await loadFileTree(selected);
+      // Reinitialize theme system for the new folder
+      await reinitializeThemeForFolder();
     }
   } catch (error) {
     console.error("Error opening folder:", error);

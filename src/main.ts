@@ -11,12 +11,16 @@ import { updateStatistics, updateCursorPosition } from "./lib/ui";
 import { renderMarkdownBatch } from "./lib/rendering";
 import { initEditorEvents } from "./lib/editor";
 import { initWindowControls } from "./lib/window-controls";
+import { initializeTheme } from "./lib/theme";
 import type { RenderRequest } from "./lib/types";
 
 /**
  * Initialize the application
  */
 async function initialize() {
+  // Initialize theme system first (loads saved theme preference)
+  await initializeTheme();
+
   // Set initial content
   const initialContent = "# Welcome to Markdown Editor\n\nStart typing...";
   const initialLines = initialContent
