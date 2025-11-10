@@ -388,6 +388,14 @@ editor.addEventListener("blur", () => {
 });
 
 async function handleCursorChange() {
+  // If there's an active selection (e.g., from Ctrl+A), don't interfere with it
+  const selection = window.getSelection();
+  if (selection && !selection.isCollapsed) {
+    // There's a selection, just update the cursor position display and return
+    updateCursorPosition();
+    return;
+  }
+
   const lineNum = getCurrentLineNumber();
 
   if (lineNum !== state.currentLine) {
