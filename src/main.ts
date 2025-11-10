@@ -204,7 +204,8 @@ function getEditorContent(): string {
 
 // Set editor content from plain text
 function setEditorContent(text: string) {
-  const lines = text.split("\n");
+  // Split on both Unix (\n) and Windows (\r\n) line endings
+  const lines = text.split(/\r?\n/).map((line: string) => line.trimEnd());
   editor.innerHTML = "";
 
   lines.forEach((line: string, index: number) => {
@@ -761,8 +762,8 @@ document.getElementById("open-file")?.addEventListener("click", async () => {
       // Clear editor completely
       editor.innerHTML = "";
 
-      // Split content into lines
-      const lines = content.split("\n");
+      // Split content into lines, handling both Unix and Windows line endings
+      const lines = content.split(/\r?\n/).map((line: string) => line.trimEnd());
 
       // Create and render each line properly
       lines.forEach((line: string, index: number) => {
@@ -872,7 +873,7 @@ window.addEventListener("beforeunload", (e) => {
 
 // Initialize
 const initialContent = "# Welcome to Markdown Editor\n\nStart typing...";
-const initialLines = initialContent.split("\n");
+const initialLines = initialContent.split(/\r?\n/).map((line: string) => line.trimEnd());
 
 initialLines.forEach((line: string, index: number) => {
   const lineDiv = document.createElement("div");
