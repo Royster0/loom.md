@@ -1,6 +1,7 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
+import { Window } from "@tauri-apps/api/window";
 import katex from "katex";
 
 // Application state
@@ -637,7 +638,7 @@ editor.addEventListener("keydown", async (e) => {
 
     // Update current line with text before cursor
     currentLine.setAttribute("data-raw", beforeCursor);
-    currentLine.innerHTML = renderMarkdownLine(beforeCursor, false);
+    currentLine.innerHTML = await renderMarkdownLine(beforeCursor, false);
     currentLine.classList.remove("editing");
 
     // Create new line with text after cursor
@@ -745,7 +746,7 @@ editor.addEventListener("keydown", async (e) => {
 
       // Update previous line with merged text
       prevLine.setAttribute("data-raw", mergedText);
-      prevLine.innerHTML = renderMarkdownLine(mergedText, true);
+      prevLine.innerHTML = await renderMarkdownLine(mergedText, true);
       prevLine.classList.add("editing");
 
       // Remove current line
@@ -841,7 +842,7 @@ editor.addEventListener("keydown", async (e) => {
 
       // Update current line with merged text
       currentLine.setAttribute("data-raw", mergedText);
-      currentLine.innerHTML = renderMarkdownLine(mergedText, true);
+      currentLine.innerHTML = await renderMarkdownLine(mergedText, true);
       currentLine.classList.add("editing");
 
       // Remove next line
@@ -1170,13 +1171,187 @@ function toggleSidebar() {
 }
 
 // ============================================================================
+// Window Control Functions
+// ============================================================================
+
+// Get the main window
+const appWindow = Window.getCurrent();
+
+// File menu toggle
+const fileMenuBtn = document.getElementById("file-menu-btn");
+const fileMenu = document.getElementById("file-menu");
+
+fileMenuBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  fileMenu?.classList.toggle("hidden");
+});
+
+// Close file menu when clicking outside
+document.addEventListener("click", (e) => {
+  const target = e.target as HTMLElement;
+  if (!fileMenu?.contains(target) && !fileMenuBtn?.contains(target)) {
+    fileMenu?.classList.add("hidden");
+  }
+});
+
+// Window controls
+document.getElementById("window-minimize")?.addEventListener("click", async () => {
+  try {
+    await appWindow.minimize();
+    console.log("Window minimized");
+  } catch (error) {
+    console.error("Failed to minimize window:", error);
+  }
+});
+
+document.getElementById("window-maximize")?.addEventListener("click", async () => {
+  try {
+    const isMaximized = await appWindow.isMaximized();
+    if (isMaximized) {
+      await appWindow.unmaximize();
+      console.log("Window unmaximized");
+    } else {
+      await appWindow.maximize();
+      console.log("Window maximized");
+    }
+  } catch (error) {
+    console.error("Failed to toggle maximize:", error);
+  }
+});
+
+document.getElementById("window-close")?.addEventListener("click", async () => {
+  try {
+    await appWindow.close();
+    console.log("Window closed");
+  } catch (error) {
+    console.error("Failed to close window:", error);
+  }
+});
+
+// ============================================================================
 // Button Event Listeners
 // ============================================================================
 
-// Toggle sidebar
+// Toggle sidebar (titlebar button)
+document.getElementById("toggle-sidebar-titlebar")?.addEventListener("click", toggleSidebar);
+
+// Toggle sidebar (old toolbar button - if it exists)
 document.getElementById("toggle-sidebar")?.addEventListener("click", toggleSidebar);
 
-// Open folder (toolbar button)
+// File menu items
+document.getElementById("file-menu-open-folder")?.addEventListener("click", async () => {
+  await openFolder();
+  fileMenu?.classList.add("hidden");
+});
+
+document.getElementById("file-menu-new-file")?.addEventListener("click", async () => {
+  if (state.isDirty) {
+    const shouldSave = confirm(
+      "You have unsaved changes. Do you want to save them?"
+    );
+    if (shouldSave) {
+      await saveFile();
+    }
+  }
+
+  // Blur editor to exit edit mode
+  editor.blur();
+  state.editMode = false;
+  state.currentLine = null;
+
+  // Set empty content
+  setEditorContent("");
+  state.content = "";
+  state.currentFile = null;
+  state.isDirty = false;
+
+  // Update UI
+  updateStatistics("");
+  updateTitle();
+
+  fileMenu?.classList.add("hidden");
+});
+
+document.getElementById("file-menu-open-file")?.addEventListener("click", async () => {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        {
+          name: "Markdown",
+          extensions: ["md", "markdown", "txt"],
+        },
+      ],
+    });
+
+    if (selected && typeof selected === "string") {
+      const content = await readTextFile(selected);
+
+      // Completely reset state
+      state.editMode = false;
+      state.currentLine = null;
+
+      // Remove focus from editor
+      editor.blur();
+
+      // Clear editor completely
+      editor.innerHTML = "";
+
+      // Split content into lines, handling both Unix and Windows line endings
+      const lines = content.split(/\r?\n/).map((line: string) => line.trimEnd());
+
+      // Create requests for batch rendering
+      const requests: RenderRequest[] = lines.map((line: string, index: number) => ({
+        line,
+        line_index: index,
+        all_lines: lines,
+        is_editing: false,
+      }));
+
+      // Batch render all lines
+      const results = await renderMarkdownBatch(requests);
+
+      // Use DocumentFragment for efficient DOM operations (single reflow)
+      const fragment = document.createDocumentFragment();
+
+      results.forEach((result, index) => {
+        const lineDiv = document.createElement("div");
+        lineDiv.className = "editor-line";
+        lineDiv.setAttribute("data-raw", lines[index]);
+        lineDiv.setAttribute("data-line", String(index));
+        lineDiv.innerHTML = result.html;
+        lineDiv.classList.remove("editing");
+        fragment.appendChild(lineDiv);
+      });
+
+      // Single DOM append (much faster than individual appends)
+      editor.appendChild(fragment);
+
+      // Update state
+      state.content = content;
+      state.currentFile = selected;
+      state.isDirty = false;
+
+      // Update UI
+      updateStatistics(content);
+      updateTitle();
+
+      console.log("File loaded, lines rendered:", lines.length);
+    }
+  } catch (error) {
+    console.error("Error opening file:", error);
+    alert("Failed to open file");
+  }
+
+  fileMenu?.classList.add("hidden");
+});
+
+document.getElementById("file-menu-save-file")?.addEventListener("click", async () => {
+  await saveFile();
+  fileMenu?.classList.add("hidden");
+});
+
+// Open folder (toolbar button - if it exists)
 document.getElementById("open-folder")?.addEventListener("click", openFolder);
 
 // Open folder (sidebar button)

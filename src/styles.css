@@ -7,6 +7,7 @@
   --border-color: #3e3e42;
   --accent-color: #007acc;
   --accent-hover: #0098ff;
+  --titlebar-height: 32px;
   --toolbar-height: 50px;
   --statusbar-height: 28px;
 
@@ -51,6 +52,142 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+}
+
+/* Title Bar */
+.titlebar {
+  height: var(--titlebar-height);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-app-region: drag;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.titlebar-title {
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.titlebar-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  border-radius: 4px;
+  height: 28px;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.titlebar-btn svg {
+  stroke: var(--text-primary);
+}
+
+.titlebar-control-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: var(--titlebar-height);
+  transition: background-color 0.2s;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-control-btn:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.titlebar-control-btn.close-btn:hover {
+  background-color: #e81123;
+  color: white;
+}
+
+.titlebar-control-btn svg {
+  stroke: var(--text-primary);
+}
+
+.titlebar-control-btn.close-btn:hover svg {
+  stroke: white;
+}
+
+/* File Menu Dropdown */
+.file-menu {
+  position: absolute;
+  top: var(--titlebar-height);
+  left: 8px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  min-width: 200px;
+  padding: 4px 0;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.file-menu.hidden {
+  display: none;
+}
+
+.file-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 8px 16px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+
+.file-menu-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.file-menu-item svg {
+  stroke: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.file-menu-item span {
+  flex: 1;
 }
 
 /* Toolbar */
@@ -258,7 +395,7 @@ body {
 .editor {
   width: 100%;
   max-width: 900px;
-  min-height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
+  min-height: calc(100vh - var(--titlebar-height) - var(--toolbar-height) - var(--statusbar-height));
   margin: 0 auto;
   padding: 48px 32px;
   outline: none;
