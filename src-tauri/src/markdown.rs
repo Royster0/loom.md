@@ -233,9 +233,9 @@ pub fn render_markdown_line(request: RenderRequest) -> LineRenderResult {
     if in_math_block {
         // Inside math block
         if is_editing {
-            // When editing, show raw LaTeX without rendering
+            // When editing, show raw LaTeX in a span wrapper for consistent structure
             return LineRenderResult {
-                html: escape_html(line),
+                html: format!("<span class=\"math-block-line-editing\">{}</span>", escape_html(line)),
                 is_code_block_boundary: false,
             };
         } else {

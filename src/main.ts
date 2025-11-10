@@ -505,6 +505,7 @@ async function handleCursorChange() {
           const innerHTML = oldLineDiv.innerHTML;
           // Check if this is a special block type by examining the HTML
           const hasSpecialClass = innerHTML.includes('code-block-line-editing') ||
+                                  innerHTML.includes('math-block-line-editing') ||
                                   innerHTML.includes('math-block-line') ||
                                   innerHTML.includes('class="math-block-start"') ||
                                   innerHTML.includes('class="math-block-end"') ||

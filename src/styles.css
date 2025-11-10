@@ -148,7 +148,8 @@ body {
 /* Remove backgrounds from code/spans when line is being edited */
 .editor-line.editing code,
 .editor-line.editing .code-block-line,
-.editor-line.editing .math-block-line {
+.editor-line.editing .math-block-line,
+.editor-line.editing .math-block-line-editing {
   background: none;
   border: none;
   padding: 0;
@@ -307,6 +308,17 @@ code {
   font-size: 1em;
   line-height: 1.5;
   padding: 0.2em 0;
+}
+
+/* Math block styling when editing (uses span wrapper for consistent structure) */
+.math-block-line-editing {
+  display: inline;
+  color: var(--h3-color);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 1em;
+  line-height: 1.5;
+  white-space: pre;
+  background: none;
 }
 
 a {
