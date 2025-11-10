@@ -312,93 +312,113 @@ async function renameItem(itemPath: string, isDir: boolean) {
  * Delete a file or folder
  */
 async function deleteItem(itemPath: string, isDir: boolean) {
+  console.log("=== DELETE ITEM CALLED ===");
+  console.log("Path:", itemPath);
+  console.log("Is directory:", isDir);
+  console.log("Call stack timestamp:", Date.now());
+
   const separator = itemPath.includes("\\") ? "\\" : "/";
   const itemName = itemPath.split(separator).pop() || "";
 
   if (isDir) {
     // Check folder contents
+    let fileCount = 0;
+    let folderCount = 0;
+
     try {
-      console.log("Checking folder contents for:", itemPath);
-      const [fileCount, folderCount] = await invoke<[number, number]>(
+      console.log("[STEP 1] Checking folder contents for:", itemPath);
+      const result = await invoke<[number, number]>(
         "count_folder_contents",
         { path: itemPath }
       );
-      console.log(`Folder contains ${fileCount} files and ${folderCount} folders`);
+      fileCount = result[0];
+      folderCount = result[1];
+      console.log(`[STEP 2] Folder contains ${fileCount} files and ${folderCount} folders`);
+    } catch (error) {
+      console.error("Failed to count folder contents:", error);
+      alert(`Failed to access folder: ${error}`);
+      return;
+    }
 
-      let confirmed = false;
-
-      if (fileCount > 0 || folderCount > 0) {
-        // Folder has contents, show detailed confirmation
-        const itemsText = [];
-        if (fileCount > 0) {
-          itemsText.push(`${fileCount} file${fileCount === 1 ? "" : "s"}`);
-        }
-        if (folderCount > 0) {
-          itemsText.push(`${folderCount} folder${folderCount === 1 ? "" : "s"}`);
-        }
-
-        console.log("Showing confirmation dialog for non-empty folder");
-        confirmed = confirm(
-          `Delete folder "${itemName}"?\n\nThis folder contains ${itemsText.join(" and ")}.\nThis action cannot be undone.`
-        );
-      } else {
-        // Empty folder
-        console.log("Showing confirmation dialog for empty folder");
-        confirmed = confirm(
-          `Delete empty folder "${itemName}"?\n\nThis action cannot be undone.`
-        );
+    // Build confirmation message
+    let confirmMessage = "";
+    if (fileCount > 0 || folderCount > 0) {
+      const itemsText = [];
+      if (fileCount > 0) {
+        itemsText.push(`${fileCount} file${fileCount === 1 ? "" : "s"}`);
       }
-
-      console.log("User confirmation result:", confirmed);
-
-      if (!confirmed) {
-        console.log("User cancelled deletion");
-        return;
+      if (folderCount > 0) {
+        itemsText.push(`${folderCount} folder${folderCount === 1 ? "" : "s"}`);
       }
+      confirmMessage = `Delete folder "${itemName}"?\n\nThis folder contains ${itemsText.join(" and ")}.\nThis action cannot be undone.`;
+    } else {
+      confirmMessage = `Delete empty folder "${itemName}"?\n\nThis action cannot be undone.`;
+    }
 
-      // Only delete if confirmed
-      console.log("User confirmed, proceeding with deletion:", itemPath);
+    console.log("[STEP 3] About to show confirmation dialog");
+    console.log("[STEP 3] Dialog message:", confirmMessage);
+
+    // CRITICAL: Show confirmation and WAIT for user response
+    const confirmed = window.confirm(confirmMessage);
+
+    console.log("[STEP 4] User responded to dialog");
+    console.log("[STEP 4] User confirmation result:", confirmed);
+    console.log("[STEP 4] Current timestamp:", Date.now());
+
+    if (!confirmed) {
+      console.log("[STEP 5] User CANCELLED deletion - returning now");
+      return;
+    }
+
+    // Only proceed if user confirmed
+    console.log("[STEP 5] User CONFIRMED deletion - proceeding");
+    console.log("[STEP 5] About to call delete_folder for:", itemPath);
+
+    try {
       await invoke("delete_folder", { path: itemPath });
-      console.log("Folder deleted successfully:", itemPath);
+      console.log("[STEP 6] Folder deleted successfully:", itemPath);
 
       // Refresh the file tree
       await refreshFileTree();
-      console.log("File tree refreshed after folder deletion");
+      console.log("[STEP 7] File tree refreshed after folder deletion");
     } catch (error) {
-      console.error("Failed to delete folder:", error);
+      console.error("[ERROR] Failed to delete folder:", error);
       alert(`Failed to delete folder: ${error}`);
     }
   } else {
     // Delete file
-    console.log("Showing confirmation dialog for file:", itemName);
-    const confirmed = confirm(
+    console.log("[STEP 1] About to show confirmation dialog for file:", itemName);
+
+    const confirmed = window.confirm(
       `Delete file "${itemName}"?\n\nThis action cannot be undone.`
     );
 
-    console.log("User confirmation result:", confirmed);
+    console.log("[STEP 2] User confirmation result:", confirmed);
 
     if (!confirmed) {
-      console.log("User cancelled file deletion");
+      console.log("[STEP 3] User CANCELLED file deletion - returning now");
       return;
     }
 
     try {
-      console.log("User confirmed, proceeding with file deletion:", itemPath);
+      console.log("[STEP 3] User CONFIRMED file deletion - proceeding");
       await invoke("delete_file", { path: itemPath });
-      console.log("File deleted successfully:", itemPath);
+      console.log("[STEP 4] File deleted successfully:", itemPath);
 
       // If deleting the currently open file, clear the editor
       if (state.currentFile === itemPath) {
         await newFile();
-        console.log("Cleared editor after deleting current file");
+        console.log("[STEP 5] Cleared editor after deleting current file");
       }
 
       // Refresh the file tree
       await refreshFileTree();
-      console.log("File tree refreshed after file deletion");
+      console.log("[STEP 6] File tree refreshed after file deletion");
     } catch (error) {
-      console.error("Failed to delete file:", error);
+      console.error("[ERROR] Failed to delete file:", error);
       alert(`Failed to delete file: ${error}`);
     }
   }
+
+  console.log("=== DELETE ITEM COMPLETED ===");
 }
