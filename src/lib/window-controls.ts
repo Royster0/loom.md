@@ -3,14 +3,73 @@
  */
 
 import { Window } from "@tauri-apps/api/window";
+import { open } from "@tauri-apps/plugin-dialog";
 import { fileMenuBtn, fileMenu } from "./dom";
 import { saveFile, newFile, openFile } from "./file-operations";
 import { openFolder, toggleSidebar } from "./file-tree";
+import { switchTheme, importTheme, getAvailableThemes } from "./theme";
+import { state } from "./state";
 
 /**
  * Get the main application window
  */
 const appWindow = Window.getCurrent();
+
+/**
+ * Populate the theme selector dropdown
+ */
+export async function populateThemeSelector() {
+  const themeSelector = document.getElementById("theme-selector") as HTMLSelectElement;
+  if (!themeSelector) return;
+
+  try {
+    const themes = await getAvailableThemes();
+    state.availableThemes = themes;
+
+    // Clear existing options
+    themeSelector.innerHTML = "";
+
+    // Add theme options
+    themes.forEach((theme) => {
+      const option = document.createElement("option");
+      option.value = theme;
+      option.textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+      if (theme === state.currentTheme) {
+        option.selected = true;
+      }
+      themeSelector.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Failed to populate theme selector:", error);
+    themeSelector.innerHTML = '<option value="">Error loading themes</option>';
+  }
+}
+
+/**
+ * Handle theme import
+ */
+async function handleImportTheme() {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        {
+          name: "Theme",
+          extensions: ["json"],
+        },
+      ],
+    });
+
+    if (selected && typeof selected === "string") {
+      const themeName = await importTheme(selected);
+      await populateThemeSelector();
+      alert(`Theme "${themeName}" imported successfully!`);
+    }
+  } catch (error) {
+    console.error("Failed to import theme:", error);
+    alert("Failed to import theme. Please ensure the file is a valid theme JSON file.");
+  }
+}
 
 /**
  * Initialize window controls
@@ -111,4 +170,29 @@ export function initWindowControls() {
   document.getElementById("new-file")?.addEventListener("click", newFile);
   document.getElementById("open-file")?.addEventListener("click", openFile);
   document.getElementById("save-file")?.addEventListener("click", saveFile);
+
+  // Theme controls
+  const themeSelector = document.getElementById("theme-selector") as HTMLSelectElement;
+  themeSelector?.addEventListener("change", async (e) => {
+    const target = e.target as HTMLSelectElement;
+    const themeName = target.value;
+    if (themeName) {
+      try {
+        await switchTheme(themeName);
+      } catch (error) {
+        console.error("Failed to switch theme:", error);
+        alert("Failed to switch theme");
+      }
+    }
+  });
+
+  document
+    .getElementById("file-menu-import-theme")
+    ?.addEventListener("click", async () => {
+      await handleImportTheme();
+      fileMenu?.classList.add("hidden");
+    });
+
+  // Populate theme selector on initialization
+  populateThemeSelector();
 }

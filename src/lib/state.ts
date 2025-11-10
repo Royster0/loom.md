@@ -15,6 +15,8 @@ export const state: EditorState = {
   currentLine: null,
   currentFolder: null,
   sidebarVisible: true,
+  currentTheme: "dark",
+  availableThemes: [],
 };
 
 /**

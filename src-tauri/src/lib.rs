@@ -1,5 +1,9 @@
 mod markdown;
+mod config;
+
 use markdown::{render_markdown_line, LineRenderResult, RenderRequest};
+use config::{ThemeConfig, AppConfig, initialize_slate_dir, load_app_config, save_app_config,
+             load_theme, list_themes, import_theme, export_theme, get_slate_dir};
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -102,8 +106,78 @@ fn read_file_from_path(path: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
+// Theme and config commands
+
+/// Initialize the .slate directory structure
+#[tauri::command]
+fn init_slate_dir() -> Result<(), String> {
+    initialize_slate_dir()
+}
+
+/// Get the path to the .slate directory
+#[tauri::command]
+fn get_slate_directory() -> Result<String, String> {
+    get_slate_dir().map(|p| p.to_string_lossy().to_string())
+}
+
+/// Load application configuration
+#[tauri::command]
+fn load_config() -> Result<AppConfig, String> {
+    load_app_config()
+}
+
+/// Save application configuration
+#[tauri::command]
+fn save_config(config: AppConfig) -> Result<(), String> {
+    save_app_config(&config)
+}
+
+/// Set the current theme
+#[tauri::command]
+fn set_theme(theme_name: String) -> Result<(), String> {
+    let mut config = load_app_config()?;
+    config.current_theme = theme_name;
+    save_app_config(&config)
+}
+
+/// Get the current theme configuration
+#[tauri::command]
+fn get_current_theme() -> Result<ThemeConfig, String> {
+    let config = load_app_config()?;
+    load_theme(&config.current_theme)
+}
+
+/// Get a theme by name
+#[tauri::command]
+fn get_theme(theme_name: String) -> Result<ThemeConfig, String> {
+    load_theme(&theme_name)
+}
+
+/// List all available themes
+#[tauri::command]
+fn get_available_themes() -> Result<Vec<String>, String> {
+    list_themes()
+}
+
+/// Import a theme from an external file
+#[tauri::command]
+fn import_custom_theme(source_path: String) -> Result<String, String> {
+    import_theme(source_path)
+}
+
+/// Export a theme to an external file
+#[tauri::command]
+fn export_custom_theme(theme_name: String, dest_path: String) -> Result<(), String> {
+    export_theme(theme_name, dest_path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize .slate directory on startup
+    if let Err(e) = initialize_slate_dir() {
+        eprintln!("Warning: Failed to initialize .slate directory: {}", e);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
@@ -113,6 +187,16 @@ pub fn run() {
             render_markdown_batch,
             read_directory,
             read_file_from_path,
+            init_slate_dir,
+            get_slate_directory,
+            load_config,
+            save_config,
+            set_theme,
+            get_current_theme,
+            get_theme,
+            get_available_themes,
+            import_custom_theme,
+            export_custom_theme,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
