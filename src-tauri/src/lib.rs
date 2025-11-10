@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+mod markdown;
+use markdown::{render_markdown_line, LineRenderResult, RenderRequest};
+
 // Plugin system structures for future extensibility
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginMetadata {
@@ -48,6 +51,18 @@ fn list_themes() -> Vec<ThemeMetadata> {
     vec![]
 }
 
+// Markdown rendering command
+#[tauri::command]
+fn render_markdown(request: RenderRequest) -> LineRenderResult {
+    render_markdown_line(request)
+}
+
+// Batch rendering for multiple lines
+#[tauri::command]
+fn render_markdown_batch(requests: Vec<RenderRequest>) -> Vec<LineRenderResult> {
+    requests.into_iter().map(render_markdown_line).collect()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -59,6 +74,8 @@ pub fn run() {
             get_platform,
             list_plugins,
             list_themes,
+            render_markdown,
+            render_markdown_batch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,6 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { marked } from "marked";
+import { invoke } from "@tauri-apps/api/core";
 import katex from "katex";
 
 // Application state
@@ -36,11 +36,18 @@ const editModeToggle = document.getElementById(
   "edit-mode-toggle"
 ) as HTMLButtonElement;
 
-// Configure marked
-marked.setOptions({
-  gfm: true,
-  breaks: true,
-});
+// Types for Rust backend communication
+interface RenderRequest {
+  line: string;
+  line_index: number;
+  all_lines: string[];
+  is_editing: boolean;
+}
+
+interface LineRenderResult {
+  html: string;
+  is_code_block_boundary: boolean;
+}
 
 // Parse and render LaTeX expressions
 function renderLatex(text: string): string {
@@ -71,131 +78,51 @@ function renderLatex(text: string): string {
   return text;
 }
 
-// Check if a line index is inside a code block
-function isInCodeBlock(lineIndex: number, allLines: string[]): { inBlock: boolean; isStart: boolean; isEnd: boolean } {
-  let inBlock = false;
-  for (let i = 0; i <= lineIndex; i++) {
-    const line = allLines[i];
-    if (line && line.trim().startsWith("```")) {
-      if (i === lineIndex) {
-        // This line is a code block boundary
-        return { inBlock: true, isStart: !inBlock, isEnd: inBlock };
-      }
-      inBlock = !inBlock;
-    }
-  }
+// Convert markdown line to HTML with styling (using Rust backend)
+async function renderMarkdownLine(line: string, isEditing: boolean, lineIndex?: number, allLines?: string[]): Promise<string> {
+  // For safety, provide defaults if lineIndex or allLines is undefined
+  const safeLineIndex = lineIndex ?? 0;
+  const safeAllLines = allLines ?? [line];
 
-  return { inBlock, isStart: false, isEnd: false };
-}
+  const request: RenderRequest = {
+    line,
+    line_index: safeLineIndex,
+    all_lines: safeAllLines,
+    is_editing: isEditing,
+  };
 
-// Convert markdown line to HTML with styling
-function renderMarkdownLine(line: string, isEditing: boolean, lineIndex?: number, allLines?: string[]): string {
-  if (isEditing) {
-    // Show raw markdown when editing
+  try {
+    const result = await invoke<LineRenderResult>("render_markdown", { request });
+    // Post-process the HTML to add LaTeX rendering
+    return renderLatexInHtml(result.html);
+  } catch (error) {
+    console.error("Error rendering markdown:", error);
+    // Fallback to escaped text
     return escapeHtml(line);
   }
-
-  // Check if this line is part of a code block
-  if (lineIndex !== undefined && allLines && allLines.length > 0) {
-    const codeBlockInfo = isInCodeBlock(lineIndex, allLines);
-
-    if (codeBlockInfo.isStart) {
-      // Starting ``` line - extract language if present
-      const langMatch = line.trim().match(/^```(\w+)?/);
-      const lang = langMatch && langMatch[1] ? langMatch[1] : '';
-      return `<span class="code-block-start" data-lang="${lang}"></span>`;
-    }
-
-    if (codeBlockInfo.isEnd) {
-      // Ending ``` line
-      return '<span class="code-block-end"></span>';
-    }
-
-    if (codeBlockInfo.inBlock) {
-      // Inside code block - show as escaped code
-      return `<code class="code-block-line">${escapeHtml(line)}</code>`;
-    }
-  }
-
-  // Empty line
-  if (line.trim() === "") {
-    return "<br>";
-  }
-
-  // Horizontal rule - check early before other patterns
-  if (line.match(/^(---+|\*\*\*+|___+)$/)) {
-    return '<span class="hr">───────────────────────────────────────</span>';
-  }
-
-  // Headers - identify structure first, then process content
-  if (line.match(/^(#{1,6})\s+(.+)$/)) {
-    const match = line.match(/^(#{1,6})\s+(.+)$/);
-    if (match) {
-      const level = match[1].length;
-      const text = match[2];
-      // Process inline markdown (which now includes LaTeX) on header text
-      const processedText = renderInlineMarkdown(text);
-      return `<span class="heading h${level}">${processedText}</span>`;
-    }
-  }
-
-  // List items - identify structure first, then process content
-  if (line.match(/^(\s*)([-*+]|\d+\.)\s+(.+)$/)) {
-    const match = line.match(/^(\s*)([-*+]|\d+\.)\s+(.+)$/);
-    if (match) {
-      const indent = match[1].length;
-      const marker = match[2];
-      const text = match[3];
-      const isOrdered = /^\d+\./.test(marker);
-      return `<span class="list-item" style="padding-left: ${indent * 20}px">
-        <span class="list-marker ${
-          isOrdered ? "ordered" : "unordered"
-        }">${marker}</span>
-        ${renderInlineMarkdown(text)}
-      </span>`;
-    }
-  }
-
-  // Blockquote - identify structure first, then process content
-  if (line.match(/^>\s*(.+)$/)) {
-    const match = line.match(/^>\s*(.+)$/);
-    if (match) {
-      return `<span class="blockquote">${renderInlineMarkdown(
-        match[1]
-      )}</span>`;
-    }
-  }
-
-  // For regular paragraphs, process inline markdown (includes LaTeX)
-  return renderInlineMarkdown(line) || "<br>";
 }
 
-// Render inline markdown (for parts of lines) including LaTeX
-function renderInlineMarkdown(text: string): string {
-  // Process LaTeX first
-  text = renderLatex(text);
+// Batch render multiple lines for better performance
+async function renderMarkdownBatch(requests: RenderRequest[]): Promise<LineRenderResult[]> {
+  try {
+    const results = await invoke<LineRenderResult[]>("render_markdown_batch", { requests });
+    // Post-process all results to add LaTeX rendering
+    return results.map((result: LineRenderResult) => ({
+      ...result,
+      html: renderLatexInHtml(result.html)
+    }));
+  } catch (error) {
+    console.error("Error batch rendering markdown:", error);
+    return requests.map(req => ({
+      html: escapeHtml(req.line),
+      is_code_block_boundary: false
+    }));
+  }
+}
 
-  // Bold + Italic
-  text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
-
-  // Bold
-  text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  text = text.replace(/__(.+?)__/g, "<strong>$1</strong>");
-
-  // Italic
-  text = text.replace(/\*(.+?)\*/g, "<em>$1</em>");
-  text = text.replace(/_(.+?)_/g, "<em>$1</em>");
-
-  // Strikethrough
-  text = text.replace(/~~(.+?)~~/g, "<del>$1</del>");
-
-  // Inline code
-  text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-  // Links
-  text = text.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2">$1</a>');
-
-  return text;
+// Post-process HTML to render LaTeX (frontend-only since we use KaTeX)
+function renderLatexInHtml(html: string): string {
+  return renderLatex(html);
 }
 
 // Escape HTML
@@ -245,17 +172,29 @@ function getEditorContent(): string {
 }
 
 // Set editor content from plain text
-function setEditorContent(text: string) {
+async function setEditorContent(text: string) {
   // Split on both Unix (\n) and Windows (\r\n) line endings
   const lines = text.split(/\r?\n/).map((line: string) => line.trimEnd());
   editor.innerHTML = "";
 
-  lines.forEach((line: string, index: number) => {
+  // Create requests for batch rendering
+  const requests: RenderRequest[] = lines.map((line, index) => ({
+    line,
+    line_index: index,
+    all_lines: lines,
+    is_editing: false,
+  }));
+
+  // Batch render all lines
+  const results = await renderMarkdownBatch(requests);
+
+  // Create and append line divs
+  results.forEach((result, index) => {
     const lineDiv = document.createElement("div");
     lineDiv.className = "editor-line";
-    lineDiv.setAttribute("data-raw", line);
+    lineDiv.setAttribute("data-raw", lines[index]);
     lineDiv.setAttribute("data-line", String(index));
-    lineDiv.innerHTML = renderMarkdownLine(line, false, index, lines);
+    lineDiv.innerHTML = result.html;
     editor.appendChild(lineDiv);
   });
 }
@@ -270,13 +209,28 @@ function setEditorContent(text: string) {
 // }
 
 // Render all lines
-function renderAllLines() {
+async function renderAllLines() {
   const allLines = getAllLines();
+
+  // Create requests for batch rendering
+  const requests: RenderRequest[] = allLines.map((line, i) => ({
+    line,
+    line_index: i,
+    all_lines: allLines,
+    is_editing: i === state.currentLine && state.editMode,
+  }));
+
+  // Batch render all lines
+  const results = await renderMarkdownBatch(requests);
+
+  // Update DOM
   for (let i = 0; i < editor.childNodes.length; i++) {
     const lineDiv = editor.childNodes[i] as HTMLElement;
-    const rawText = lineDiv.getAttribute("data-raw") || "";
     const isCurrentLine = i === state.currentLine && state.editMode;
-    lineDiv.innerHTML = renderMarkdownLine(rawText, isCurrentLine, i, allLines);
+
+    if (results[i]) {
+      lineDiv.innerHTML = results[i].html;
+    }
 
     if (isCurrentLine) {
       lineDiv.classList.add("editing");
@@ -423,7 +377,7 @@ editor.addEventListener("blur", () => {
   renderAllLines();
 });
 
-function handleCursorChange() {
+async function handleCursorChange() {
   const lineNum = getCurrentLineNumber();
 
   if (lineNum !== state.currentLine) {
@@ -443,7 +397,9 @@ function handleCursorChange() {
         oldLineDiv.setAttribute("data-raw", currentText);
         // Update allLines to reflect the change
         allLines[oldLine] = currentText;
-        oldLineDiv.innerHTML = renderMarkdownLine(currentText, false, oldLine, allLines);
+
+        const html = await renderMarkdownLine(currentText, false, oldLine, allLines);
+        oldLineDiv.innerHTML = html;
         oldLineDiv.classList.remove("editing");
       }
     }
@@ -465,7 +421,8 @@ function handleCursorChange() {
       }
 
       // Update the line to show raw markdown
-      currentLineDiv.innerHTML = renderMarkdownLine(rawText, true, lineNum, allLines);
+      const html = await renderMarkdownLine(rawText, true, lineNum, allLines);
+      currentLineDiv.innerHTML = html;
       currentLineDiv.classList.add("editing");
 
       // Restore cursor position
@@ -490,7 +447,7 @@ function handleCursorChange() {
 }
 
 // Handle Enter key - create new line and split at cursor
-editor.addEventListener("keydown", (e) => {
+editor.addEventListener("keydown", async (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
 
@@ -541,16 +498,35 @@ editor.addEventListener("keydown", (e) => {
 
     // Re-render affected lines (from current line onwards)
     const allLines = getAllLines();
+    const requests: RenderRequest[] = [];
     for (let i = currentLineNum; i < editor.childNodes.length; i++) {
       const lineDiv = editor.childNodes[i] as HTMLElement;
       const rawText = lineDiv.getAttribute("data-raw") || "";
       const isEditing = i === currentLineNum + 1; // New line is in edit mode
-      lineDiv.innerHTML = renderMarkdownLine(rawText, isEditing, i, allLines);
+      requests.push({
+        line: rawText,
+        line_index: i,
+        all_lines: allLines,
+        is_editing: isEditing,
+      });
+    }
+
+    const results = await renderMarkdownBatch(requests);
+    let resultIndex = 0;
+    for (let i = currentLineNum; i < editor.childNodes.length; i++) {
+      const lineDiv = editor.childNodes[i] as HTMLElement;
+      const isEditing = i === currentLineNum + 1;
+
+      if (results[resultIndex]) {
+        lineDiv.innerHTML = results[resultIndex].html;
+      }
+
       if (isEditing) {
         lineDiv.classList.add("editing");
       } else {
         lineDiv.classList.remove("editing");
       }
+      resultIndex++;
     }
 
     // Move cursor to beginning of new line
@@ -616,16 +592,35 @@ editor.addEventListener("keydown", (e) => {
 
       // Re-render affected lines (from previous line onwards)
       const allLines = getAllLines();
+      const requests: RenderRequest[] = [];
       for (let i = currentLineNum - 1; i < editor.childNodes.length; i++) {
         const lineDiv = editor.childNodes[i] as HTMLElement;
         const rawText = lineDiv.getAttribute("data-raw") || "";
         const isEditing = i === currentLineNum - 1; // Previous line (now merged) is in edit mode
-        lineDiv.innerHTML = renderMarkdownLine(rawText, isEditing, i, allLines);
+        requests.push({
+          line: rawText,
+          line_index: i,
+          all_lines: allLines,
+          is_editing: isEditing,
+        });
+      }
+
+      const results = await renderMarkdownBatch(requests);
+      let resultIndex = 0;
+      for (let i = currentLineNum - 1; i < editor.childNodes.length; i++) {
+        const lineDiv = editor.childNodes[i] as HTMLElement;
+        const isEditing = i === currentLineNum - 1;
+
+        if (results[resultIndex]) {
+          lineDiv.innerHTML = results[resultIndex].html;
+        }
+
         if (isEditing) {
           lineDiv.classList.add("editing");
         } else {
           lineDiv.classList.remove("editing");
         }
+        resultIndex++;
       }
 
       // Move cursor to merge point in previous line
@@ -691,16 +686,35 @@ editor.addEventListener("keydown", (e) => {
 
       // Re-render affected lines (from current line onwards)
       const allLines = getAllLines();
+      const requests: RenderRequest[] = [];
       for (let i = currentLineNum; i < editor.childNodes.length; i++) {
         const lineDiv = editor.childNodes[i] as HTMLElement;
         const rawText = lineDiv.getAttribute("data-raw") || "";
         const isEditing = i === currentLineNum; // Current line (now merged) is in edit mode
-        lineDiv.innerHTML = renderMarkdownLine(rawText, isEditing, i, allLines);
+        requests.push({
+          line: rawText,
+          line_index: i,
+          all_lines: allLines,
+          is_editing: isEditing,
+        });
+      }
+
+      const results = await renderMarkdownBatch(requests);
+      let resultIndex = 0;
+      for (let i = currentLineNum; i < editor.childNodes.length; i++) {
+        const lineDiv = editor.childNodes[i] as HTMLElement;
+        const isEditing = i === currentLineNum;
+
+        if (results[resultIndex]) {
+          lineDiv.innerHTML = results[resultIndex].html;
+        }
+
         if (isEditing) {
           lineDiv.classList.add("editing");
         } else {
           lineDiv.classList.remove("editing");
         }
+        resultIndex++;
       }
 
       // Keep cursor at same position
@@ -847,20 +861,25 @@ document.getElementById("open-file")?.addEventListener("click", async () => {
       // Split content into lines, handling both Unix and Windows line endings
       const lines = content.split(/\r?\n/).map((line: string) => line.trimEnd());
 
-      // Create and render each line properly
-      lines.forEach((line: string, index: number) => {
+      // Create requests for batch rendering
+      const requests: RenderRequest[] = lines.map((line: string, index: number) => ({
+        line,
+        line_index: index,
+        all_lines: lines,
+        is_editing: false,
+      }));
+
+      // Batch render all lines
+      const results = await renderMarkdownBatch(requests);
+
+      // Create and append line divs
+      results.forEach((result, index) => {
         const lineDiv = document.createElement("div");
         lineDiv.className = "editor-line";
-        lineDiv.setAttribute("data-raw", line);
+        lineDiv.setAttribute("data-raw", lines[index]);
         lineDiv.setAttribute("data-line", String(index));
-
-        // Render the line with isEditing = false to show styled content
-        const renderedContent = renderMarkdownLine(line, false, index, lines);
-        lineDiv.innerHTML = renderedContent;
-
-        // Make sure it's not marked as editing
+        lineDiv.innerHTML = result.html;
         lineDiv.classList.remove("editing");
-
         editor.appendChild(lineDiv);
       });
 
@@ -954,21 +973,35 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 // Initialize
-const initialContent = "# Welcome to Markdown Editor\n\nStart typing...";
-const initialLines = initialContent.split(/\r?\n/).map((line: string) => line.trimEnd());
+(async () => {
+  const initialContent = "# Welcome to Markdown Editor\n\nStart typing...";
+  const initialLines = initialContent.split(/\r?\n/).map((line: string) => line.trimEnd());
 
-initialLines.forEach((line: string, index: number) => {
-  const lineDiv = document.createElement("div");
-  lineDiv.className = "editor-line";
-  lineDiv.setAttribute("data-raw", line);
-  lineDiv.setAttribute("data-line", String(index));
-  lineDiv.innerHTML = renderMarkdownLine(line, false, index, initialLines);
-  lineDiv.classList.remove("editing");
-  editor.appendChild(lineDiv);
-});
+  // Create requests for batch rendering
+  const requests: RenderRequest[] = initialLines.map((line, index) => ({
+    line,
+    line_index: index,
+    all_lines: initialLines,
+    is_editing: false,
+  }));
 
-state.content = initialContent;
-updateStatistics(state.content);
-updateCursorPosition();
-state.editMode = false;
-state.currentLine = null;
+  // Batch render all lines
+  const results = await renderMarkdownBatch(requests);
+
+  // Create and append line divs
+  results.forEach((result, index) => {
+    const lineDiv = document.createElement("div");
+    lineDiv.className = "editor-line";
+    lineDiv.setAttribute("data-raw", initialLines[index]);
+    lineDiv.setAttribute("data-line", String(index));
+    lineDiv.innerHTML = result.html;
+    lineDiv.classList.remove("editing");
+    editor.appendChild(lineDiv);
+  });
+
+  state.content = initialContent;
+  updateStatistics(state.content);
+  updateCursorPosition();
+  state.editMode = false;
+  state.currentLine = null;
+})();
