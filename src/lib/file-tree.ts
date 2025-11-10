@@ -5,9 +5,22 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileEntry } from "./types";
-import { fileTree, sidebar } from "./dom";
+import { fileTree, sidebar, explorerHeader } from "./dom";
 import { state } from "./state";
 import { loadFileContent } from "./file-operations";
+
+/**
+ * Update the explorer header to show the current folder name
+ */
+function updateExplorerHeader() {
+  if (state.currentFolder) {
+    // Extract folder name from path
+    const folderName = state.currentFolder.split(/[\\/]/).pop() || "EXPLORER";
+    explorerHeader.textContent = folderName.toUpperCase();
+  } else {
+    explorerHeader.textContent = "EXPLORER";
+  }
+}
 
 /**
  * Open folder dialog and load file tree
@@ -21,6 +34,7 @@ export async function openFolder() {
 
     if (selected && typeof selected === "string") {
       state.currentFolder = selected;
+      updateExplorerHeader();
       await loadFileTree(selected);
     }
   } catch (error) {
