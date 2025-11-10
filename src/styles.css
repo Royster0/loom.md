@@ -1,34 +1,34 @@
 :root {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252526;
-  --bg-tertiary: #2d2d30;
-  --text-primary: #d4d4d4;
-  --text-secondary: #858585;
-  --border-color: #3e3e42;
-  --accent-color: #007acc;
-  --accent-hover: #0098ff;
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2128;
+  --text-primary: #e6edf3;
+  --text-secondary: #7d8590;
+  --border-color: #30363d;
+  --accent-color: #58a6ff;
+  --accent-hover: #79c0ff;
   --titlebar-height: 32px;
   --toolbar-height: 50px;
   --statusbar-height: 28px;
 
   /* Heading colors */
-  --heading-color: #4ec9b0;
-  --h1-color: #569cd6;
-  --h2-color: #4ec9b0;
-  --h3-color: #dcdcaa;
-  --h4-color: #9cdcfe;
-  --h5-color: #c586c0;
-  --h6-color: #858585;
+  --heading-color: #7ee787;
+  --h1-color: #79c0ff;
+  --h2-color: #7ee787;
+  --h3-color: #ffa657;
+  --h4-color: #a5d6ff;
+  --h5-color: #d2a8ff;
+  --h6-color: #8b949e;
 
   /* Syntax colors */
-  --code-bg: #1e1e1e;
-  --code-color: #ce9178;
-  --link-color: #3794ff;
-  --strong-color: #d4d4d4;
-  --em-color: #d4d4d4;
-  --del-color: #858585;
-  --blockquote-color: #858585;
-  --blockquote-border: #3e3e42;
+  --code-bg: #0d1117;
+  --code-color: #ffa657;
+  --link-color: #58a6ff;
+  --strong-color: #e6edf3;
+  --em-color: #e6edf3;
+  --del-color: #8b949e;
+  --blockquote-color: #8b949e;
+  --blockquote-border: #30363d;
 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, sans-serif;
@@ -57,7 +57,7 @@ body {
 /* Title Bar */
 .titlebar {
   height: var(--titlebar-height);
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -105,7 +105,7 @@ body {
 }
 
 .titlebar-btn:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-tertiary);
 }
 
 .titlebar-btn svg {
@@ -128,7 +128,7 @@ body {
 }
 
 .titlebar-control-btn:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-tertiary);
 }
 
 .titlebar-control-btn.close-btn:hover {
@@ -587,6 +587,11 @@ code {
   font-size: 1em;
   line-height: 1.5;
   padding: 0.2em 0;
+}
+
+/* KaTeX elements should be readable on dark background */
+.math-block-line .katex {
+  color: var(--text-primary);
 }
 
 /* Math block styling when editing (uses span wrapper for consistent structure) */

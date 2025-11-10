@@ -1,7 +1,7 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Window } from "@tauri-apps/api/window";
 import katex from "katex";
 
 // Application state
@@ -1174,7 +1174,8 @@ function toggleSidebar() {
 // Window Control Functions
 // ============================================================================
 
-const appWindow = getCurrentWindow();
+// Get the main window
+const appWindow = Window.getCurrent();
 
 // File menu toggle
 const fileMenuBtn = document.getElementById("file-menu-btn");
@@ -1195,15 +1196,36 @@ document.addEventListener("click", (e) => {
 
 // Window controls
 document.getElementById("window-minimize")?.addEventListener("click", async () => {
-  await appWindow.minimize();
+  try {
+    await appWindow.minimize();
+    console.log("Window minimized");
+  } catch (error) {
+    console.error("Failed to minimize window:", error);
+  }
 });
 
 document.getElementById("window-maximize")?.addEventListener("click", async () => {
-  await appWindow.toggleMaximize();
+  try {
+    const isMaximized = await appWindow.isMaximized();
+    if (isMaximized) {
+      await appWindow.unmaximize();
+      console.log("Window unmaximized");
+    } else {
+      await appWindow.maximize();
+      console.log("Window maximized");
+    }
+  } catch (error) {
+    console.error("Failed to toggle maximize:", error);
+  }
 });
 
 document.getElementById("window-close")?.addEventListener("click", async () => {
-  await appWindow.close();
+  try {
+    await appWindow.close();
+    console.log("Window closed");
+  } catch (error) {
+    console.error("Failed to close window:", error);
+  }
 });
 
 // ============================================================================
