@@ -142,8 +142,7 @@ body {
 }
 
 .editor-line.editing {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  color: var(--text-secondary);
+  /* Keep styling visible while editing - don't override font or color */
 }
 
 /* Headings */
@@ -236,7 +235,15 @@ code {
 /* Code blocks */
 .code-block-start,
 .code-block-end {
-  display: none; /* Hide the ``` markers */
+  display: none; /* Hide the ``` markers when not editing */
+  color: var(--text-secondary);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+}
+
+/* Show code block markers when editing */
+.editing .code-block-start,
+.editing .code-block-end {
+  display: inline;
 }
 
 .code-block-line {
