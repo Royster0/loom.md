@@ -298,7 +298,6 @@ body {
   height: 36px;
   padding: 0 4px;
   gap: 2px;
-  justify-content: space-between;
 }
 
 .tab-bar::-webkit-scrollbar {
