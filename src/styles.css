@@ -558,6 +558,23 @@ body {
   flex: 1;
 }
 
+/* Drag and Drop Styles */
+.tree-item.dragging {
+  opacity: 0.4;
+  cursor: move;
+}
+
+.tree-item.drag-over {
+  background-color: var(--accent-color);
+  color: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.tree-item.drag-over .tree-item-icon,
+.tree-item.drag-over .tree-item-arrow {
+  color: var(--bg-primary);
+}
+
 .tree-children {
   padding-left: 16px;
 }

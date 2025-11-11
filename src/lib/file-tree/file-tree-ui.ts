@@ -8,8 +8,12 @@ import type { FileEntry } from "../core/types";
 import { fileTree } from "../core/dom";
 import { loadFileContent } from "../file-operations";
 import { showContextMenu, initContextMenu } from "./context-menu";
-import { expandedFolders } from "./file-tree-core";
+import { expandedFolders, refreshAndRevealFile } from "./file-tree-core";
 import { initSidebarResize } from "./sidebar";
+import { state } from "../core/state";
+
+// Store the currently dragged item
+let draggedItemPath: string | null = null;
 
 /**
  * Context menu handler for empty space in file tree
@@ -56,6 +60,9 @@ export function createTreeItem(entry: FileEntry, level: number = 0): HTMLElement
   item.style.paddingLeft = `${level * 16 + 8}px`;
   item.setAttribute("data-path", entry.path);
   item.setAttribute("data-is-dir", entry.is_dir.toString());
+
+  // Make item draggable
+  item.setAttribute("draggable", "true");
 
   // Arrow for folders
   if (entry.is_dir) {
@@ -133,6 +140,9 @@ export function createTreeItem(entry: FileEntry, level: number = 0): HTMLElement
     });
   }
 
+  // Drag and drop handlers
+  setupDragAndDrop(item, entry);
+
   return container;
 }
 
@@ -177,6 +187,103 @@ async function toggleFolder(
     childrenContainer.classList.add("collapsed");
     arrow?.classList.remove("expanded");
     expandedFolders.delete(entry.path);
+  }
+}
+
+/**
+ * Setup drag and drop handlers for a tree item
+ * @param item - The tree item element
+ * @param entry - File entry for the item
+ */
+function setupDragAndDrop(item: HTMLElement, entry: FileEntry) {
+  // Drag start handler
+  item.addEventListener("dragstart", (e: DragEvent) => {
+    draggedItemPath = entry.path;
+    item.classList.add("dragging");
+
+    // Set drag data
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", entry.path);
+    }
+  });
+
+  // Drag end handler
+  item.addEventListener("dragend", () => {
+    item.classList.remove("dragging");
+    draggedItemPath = null;
+
+    // Remove all drag-over classes
+    document.querySelectorAll(".tree-item.drag-over")
+      .forEach(el => el.classList.remove("drag-over"));
+  });
+
+  // Only folders can be drop targets
+  if (entry.is_dir) {
+    // Drag over handler (allow drop)
+    item.addEventListener("dragover", (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = "move";
+      }
+
+      // Don't allow dropping into itself
+      if (draggedItemPath && draggedItemPath !== entry.path) {
+        // Check if we're not trying to move a parent folder into its child
+        if (!entry.path.startsWith(draggedItemPath + "/") &&
+            !entry.path.startsWith(draggedItemPath + "\\")) {
+          item.classList.add("drag-over");
+        }
+      }
+    });
+
+    // Drag leave handler
+    item.addEventListener("dragleave", (e: DragEvent) => {
+      e.stopPropagation();
+      item.classList.remove("drag-over");
+    });
+
+    // Drop handler
+    item.addEventListener("drop", async (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove("drag-over");
+
+      if (!draggedItemPath) return;
+
+      // Don't allow dropping into itself
+      if (draggedItemPath === entry.path) {
+        return;
+      }
+
+      // Don't allow moving a parent folder into its child
+      if (entry.path.startsWith(draggedItemPath + "/") ||
+          entry.path.startsWith(draggedItemPath + "\\")) {
+        alert("Cannot move a folder into its own subfolder");
+        return;
+      }
+
+      try {
+        // Move the file/folder
+        const newPath = await invoke<string>("move_path", {
+          sourcePath: draggedItemPath,
+          destDirPath: entry.path,
+        });
+
+        // Update state if we moved the currently open file
+        if (state.currentFile === draggedItemPath) {
+          state.currentFile = newPath;
+        }
+
+        // Refresh and reveal the moved item
+        await refreshAndRevealFile(newPath);
+      } catch (error) {
+        console.error("Failed to move:", error);
+        alert(`Failed to move: ${error}`);
+      }
+    });
   }
 }
 
