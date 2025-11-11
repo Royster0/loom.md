@@ -138,46 +138,49 @@ export async function closeTab(index: number): Promise<void> {
 
   // Check for unsaved changes
   if (tab.isDirty) {
-    // Use a custom dialog approach with better options
-    const message = `Save changes to ${getTabDisplayName(tab)}?`;
-    const result = window.confirm(
-      `${message}\n\nClick OK to save, Cancel to discard changes.`
+    // Ask user what to do with unsaved changes
+    const shouldSave = window.confirm(
+      `Do you want to save changes to ${getTabDisplayName(tab)}?\n\nOK = Save and close\nCancel = Don't save`
     );
 
-    if (result) {
-      // User clicked OK - try to save
+    if (shouldSave) {
+      // User wants to save
       if (tab.filePath) {
-        // Temporarily switch to this tab to save it
+        // File has a path, save it directly
         const wasActiveIndex = activeTabIndex;
         activeTabIndex = index;
-        await loadTabState(tab);
+        state.content = tab.content;
+        state.currentFile = tab.filePath;
+        state.isDirty = tab.isDirty;
+
         await saveFile();
+
         activeTabIndex = wasActiveIndex;
       } else {
-        // No file path - need to save as
-        // Switch to this tab first so user can save it
+        // No file path - need to show save dialog
+        // Switch to this tab first
         await switchToTab(index);
         await saveFile();
-        // After save, the tab might have been assigned a path
-        // Check again if we should still close it
-        const stillDirty = tabs[index]?.isDirty;
-        if (stillDirty) {
-          // User cancelled the save dialog, don't close the tab
+
+        // Check if user cancelled the save dialog
+        if (tabs[index]?.isDirty) {
+          // Still dirty means user cancelled, don't close
           return;
         }
       }
     } else {
-      // User clicked Cancel - ask if they want to close without saving
-      const confirmDiscard = window.confirm(
-        `Close without saving?\n\nClick OK to close without saving, Cancel to keep the tab open.`
+      // User chose not to save, confirm they want to close without saving
+      const confirmClose = window.confirm(
+        `Close without saving?`
       );
-      if (!confirmDiscard) {
-        // User doesn't want to discard, cancel the close operation
+      if (!confirmClose) {
+        // User changed their mind, keep tab open
         return;
       }
     }
   }
 
+  // At this point, we're committed to closing the tab
   // Remove the tab
   tabs.splice(index, 1);
 
