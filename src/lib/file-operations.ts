@@ -5,12 +5,11 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
-import { state, updateTitle } from "./state";
-import { editor } from "./dom";
-import { setEditorContent } from "./rendering";
+import { state } from "./state";
 import { updateStatistics } from "./ui";
 import { refreshFileTree } from "./file-tree";
 import { hideWelcomeScreen } from "./welcome-screen";
+import { openInTab, markCurrentTabClean } from "./tabs";
 
 /**
  * Save the current file
@@ -19,8 +18,7 @@ export async function saveFile(): Promise<void> {
   try {
     if (state.currentFile) {
       await writeTextFile(state.currentFile, state.content);
-      state.isDirty = false;
-      updateTitle();
+      markCurrentTabClean();
     } else {
       await saveFileAs();
     }
@@ -49,8 +47,7 @@ export async function saveFileAs(): Promise<void> {
       const isNewFile = state.currentFile !== filePath;
       await writeTextFile(filePath, state.content);
       state.currentFile = filePath;
-      state.isDirty = false;
-      updateTitle();
+      markCurrentTabClean();
 
       // Refresh file tree if we saved a new file in the current folder
       if (isNewFile && state.currentFolder) {
@@ -67,29 +64,12 @@ export async function saveFileAs(): Promise<void> {
  * Create a new file
  */
 export async function newFile(): Promise<void> {
-  if (state.isDirty) {
-    const shouldSave = confirm(
-      "You have unsaved changes. Do you want to save them?"
-    );
-    if (shouldSave) {
-      await saveFile();
-    }
-  }
-
-  // Blur editor to exit edit mode
-  editor.blur();
-  state.editMode = false;
-  state.currentLine = null;
-
-  // Set empty content
-  await setEditorContent("");
-  state.content = "";
-  state.currentFile = null;
-  state.isDirty = false;
+  // Open a new empty tab
+  await openInTab(null, "");
 
   // Update UI
   updateStatistics("");
-  updateTitle();
+  hideWelcomeScreen();
 }
 
 /**
@@ -136,25 +116,11 @@ export async function loadFileContent(filePath: string): Promise<void> {
       console.log("File read via fs plugin, content length:", content.length);
     }
 
-    // Completely reset state
-    state.editMode = false;
-    state.currentLine = null;
-
-    // Remove focus from editor
-    editor.blur();
-
-    // Clear editor completely
-    editor.innerHTML = "";
-
-    // Set content
-    await setEditorContent(content);
-    state.content = content;
-    state.currentFile = filePath;
-    state.isDirty = false;
+    // Open file in a tab (will create new tab or switch to existing)
+    await openInTab(filePath, content);
 
     // Update UI
     updateStatistics(content);
-    updateTitle();
 
     // Hide welcome screen since file is now loaded
     hideWelcomeScreen();

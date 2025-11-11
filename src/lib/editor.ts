@@ -14,6 +14,7 @@ import {
 import { updateStatistics, updateCursorPosition, getCurrentLineNumber } from "./ui";
 import { RenderRequest } from "./types";
 import { saveFile } from "./file-operations";
+import { markCurrentTabDirty, updateCurrentTabContent, closeActiveTab } from "./tabs";
 
 /**
  * Helper function to get the first text node, even if wrapped in elements
@@ -261,7 +262,8 @@ export async function handleInput() {
 
   state.content = getEditorContent();
   updateStatistics(state.content);
-  markDirty();
+  updateCurrentTabContent(state.content);
+  markCurrentTabDirty();
 }
 
 /**
@@ -368,7 +370,8 @@ async function handleEnterKey(e: KeyboardEvent) {
   state.currentLine = currentLineNum + 1;
   state.content = getEditorContent();
   updateStatistics(state.content);
-  markDirty();
+  updateCurrentTabContent(state.content);
+  markCurrentTabDirty();
 }
 
 /**
@@ -712,6 +715,12 @@ export function initEditorEvents() {
     if ((e.ctrlKey || e.metaKey) && e.key === "o") {
       e.preventDefault();
       document.getElementById("open-file")?.click();
+    }
+
+    // Ctrl/Cmd + W to close tab
+    if ((e.ctrlKey || e.metaKey) && e.key === "w") {
+      e.preventDefault();
+      await closeActiveTab();
     }
   });
 
