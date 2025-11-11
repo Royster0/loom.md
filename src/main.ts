@@ -13,7 +13,7 @@ import { initWindowControls } from "./lib/window-controls";
 import { initializeTheme } from "./lib/theme";
 import { initializeSettings } from "./lib/settings";
 import { initFileTree } from "./lib/file-tree";
-import { initWelcomeScreen } from "./lib/welcome-screen";
+import { initWelcomeScreen, hideWelcomeScreen } from "./lib/welcome-screen";
 import { initTabs, openInTab, closeTab, getTabs } from "./lib/tabs";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 
@@ -34,6 +34,9 @@ async function checkAndOpenFileFromUrl(): Promise<boolean> {
 
       // Open it in a new tab
       await openInTab(decodedPath, content);
+
+      // Hide the welcome screen since we have a file open
+      hideWelcomeScreen();
 
       console.log("File opened successfully:", decodedPath);
       return true;
