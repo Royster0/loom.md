@@ -138,16 +138,43 @@ export async function closeTab(index: number): Promise<void> {
 
   // Check for unsaved changes
   if (tab.isDirty) {
-    const shouldSave = confirm(
-      `Do you want to save changes to ${getTabDisplayName(tab)}?`
+    // Use a custom dialog approach with better options
+    const message = `Save changes to ${getTabDisplayName(tab)}?`;
+    const result = window.confirm(
+      `${message}\n\nClick OK to save, Cancel to discard changes.`
     );
-    if (shouldSave && tab.filePath) {
-      // Temporarily switch to this tab to save it
-      const wasActiveIndex = activeTabIndex;
-      activeTabIndex = index;
-      await loadTabState(tab);
-      await saveFile();
-      activeTabIndex = wasActiveIndex;
+
+    if (result) {
+      // User clicked OK - try to save
+      if (tab.filePath) {
+        // Temporarily switch to this tab to save it
+        const wasActiveIndex = activeTabIndex;
+        activeTabIndex = index;
+        await loadTabState(tab);
+        await saveFile();
+        activeTabIndex = wasActiveIndex;
+      } else {
+        // No file path - need to save as
+        // Switch to this tab first so user can save it
+        await switchToTab(index);
+        await saveFile();
+        // After save, the tab might have been assigned a path
+        // Check again if we should still close it
+        const stillDirty = tabs[index]?.isDirty;
+        if (stillDirty) {
+          // User cancelled the save dialog, don't close the tab
+          return;
+        }
+      }
+    } else {
+      // User clicked Cancel - ask if they want to close without saving
+      const confirmDiscard = window.confirm(
+        `Close without saving?\n\nClick OK to close without saving, Cancel to keep the tab open.`
+      );
+      if (!confirmDiscard) {
+        // User doesn't want to discard, cancel the close operation
+        return;
+      }
     }
   }
 
@@ -156,11 +183,23 @@ export async function closeTab(index: number): Promise<void> {
 
   // Update active tab index
   if (tabs.length === 0) {
-    // No tabs left, create a new empty tab
-    const emptyTab = createTab(null, "");
-    tabs.push(emptyTab);
-    activeTabIndex = 0;
-    await loadTabState(emptyTab);
+    // No tabs left - only create empty tab if no folder is open
+    if (!state.currentFolder) {
+      const emptyTab = createTab(null, "");
+      tabs.push(emptyTab);
+      activeTabIndex = 0;
+      await loadTabState(emptyTab);
+    } else {
+      // Folder is open, just clear the editor
+      activeTabIndex = -1;
+      state.content = "";
+      state.isDirty = false;
+      state.currentLine = null;
+      state.currentFile = null;
+      editor.innerHTML = "";
+      updateTitle();
+      updateTabBar();
+    }
   } else if (index <= activeTabIndex) {
     // Adjust active tab index
     activeTabIndex = Math.max(0, activeTabIndex - 1);
@@ -323,8 +362,8 @@ export function updateTabBar(): void {
  * Initialize the tab system
  */
 export function initTabs(): void {
-  // Create initial empty tab if no tabs exist
-  if (tabs.length === 0) {
+  // Create initial empty tab if no tabs exist and no folder is open
+  if (tabs.length === 0 && !state.currentFolder) {
     const initialTab = createTab(state.currentFile, state.content);
     initialTab.isDirty = state.isDirty;
     initialTab.cursorLine = state.currentLine;
