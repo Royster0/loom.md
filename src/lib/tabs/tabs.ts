@@ -136,51 +136,41 @@ export async function closeTab(index: number): Promise<void> {
 
   const tab = tabs[index];
 
-  // Check for unsaved changes
+  // Autosave if there are unsaved changes
   if (tab.isDirty) {
-    // Ask user what to do with unsaved changes
-    const shouldSave = window.confirm(
-      `Do you want to save changes to ${getTabDisplayName(tab)}?\n\nOK = Save and close\nCancel = Don't save`
-    );
+    if (tab.filePath) {
+      // File has a path, save it directly without visual tab switching
+      const wasActiveIndex = activeTabIndex;
+      const wasContent = state.content;
+      const wasFile = state.currentFile;
+      const wasDirty = state.isDirty;
 
-    if (shouldSave) {
-      // User wants to save
-      if (tab.filePath) {
-        // File has a path, save it directly
-        const wasActiveIndex = activeTabIndex;
-        activeTabIndex = index;
-        state.content = tab.content;
-        state.currentFile = tab.filePath;
-        state.isDirty = tab.isDirty;
+      // Temporarily update state to save this tab's content
+      activeTabIndex = index;
+      state.content = tab.content;
+      state.currentFile = tab.filePath;
+      state.isDirty = tab.isDirty;
 
-        await saveFile();
+      await saveFile();
 
-        activeTabIndex = wasActiveIndex;
-      } else {
-        // No file path - need to show save dialog
-        // Switch to this tab first
-        await switchToTab(index);
-        await saveFile();
-
-        // Check if user cancelled the save dialog
-        if (tabs[index]?.isDirty) {
-          // Still dirty means user cancelled, don't close
-          return;
-        }
-      }
+      // Restore previous state
+      activeTabIndex = wasActiveIndex;
+      state.content = wasContent;
+      state.currentFile = wasFile;
+      state.isDirty = wasDirty;
     } else {
-      // User chose not to save, confirm they want to close without saving
-      const confirmClose = window.confirm(
-        `Close without saving?`
-      );
-      if (!confirmClose) {
-        // User changed their mind, keep tab open
+      // No file path - new/untitled file, need to show save dialog
+      await switchToTab(index);
+      await saveFile();
+
+      // Check if user cancelled the save dialog
+      if (tabs[index]?.isDirty) {
+        // Still dirty means user cancelled save dialog, abort close
         return;
       }
     }
   }
 
-  // At this point, we're committed to closing the tab
   // Remove the tab
   tabs.splice(index, 1);
 
