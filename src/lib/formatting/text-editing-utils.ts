@@ -94,8 +94,27 @@ export function cut() {
 }
 
 /**
- * Paste - uses browser's native paste
+ * Paste - uses Clipboard API
  */
-export function paste() {
-  document.execCommand('paste');
+export async function paste() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      // Create a synthetic paste event with clipboard data
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text/plain', text);
+
+      const pasteEvent = new ClipboardEvent('paste', {
+        clipboardData: clipboardData,
+        bubbles: true,
+        cancelable: true
+      });
+
+      editor.dispatchEvent(pasteEvent);
+    }
+  } catch (err) {
+    console.error('Failed to read clipboard:', err);
+    // Fallback to execCommand for older browsers
+    document.execCommand('paste');
+  }
 }
