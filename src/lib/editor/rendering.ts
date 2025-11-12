@@ -83,7 +83,8 @@ export function convertImagePaths(html: string): string {
         }
 
         // Convert file path to Tauri asset URL
-        const assetUrl = convertFileSrc(src);
+        // Explicitly specify 'asset' protocol to ensure it uses https://asset.localhost
+        const assetUrl = convertFileSrc(src, 'asset');
         console.log(`Converting image path: ${src} -> ${assetUrl}`);
         return `<img${before}src="${assetUrl}"${after}>`;
       } catch (e) {
