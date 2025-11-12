@@ -226,9 +226,14 @@ function setupDragAndDrop(item: HTMLElement, entry: FileEntry) {
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", entry.path);
-    }
 
-    console.log("  ✓ Drag data set, effectAllowed: move");
+      // Debug: Check if dataTransfer is properly set
+      console.log("  ✓ Drag data set, effectAllowed:", e.dataTransfer.effectAllowed);
+      console.log("  ✓ DataTransfer types:", e.dataTransfer.types);
+      console.log("  ✓ DataTransfer items length:", e.dataTransfer.items.length);
+    } else {
+      console.log("  ✗ ERROR: dataTransfer is null!");
+    }
   });
 
   // Drag end handler
@@ -372,5 +377,16 @@ export function initFileTree() {
   fileTree.addEventListener("dragenter", (e: DragEvent) => {
     e.preventDefault();
     console.log("🌍 Global dragenter on fileTree, target:", (e.target as HTMLElement)?.className);
+  });
+
+  // EXTREME DEBUG: Add to document to see if drag events fire ANYWHERE
+  document.addEventListener("dragover", (e: DragEvent) => {
+    e.preventDefault();
+    console.log("🌐 DOCUMENT dragover, target:", (e.target as HTMLElement)?.className || (e.target as HTMLElement)?.tagName);
+  });
+
+  document.addEventListener("dragenter", (e: DragEvent) => {
+    e.preventDefault();
+    console.log("🌐 DOCUMENT dragenter, target:", (e.target as HTMLElement)?.className || (e.target as HTMLElement)?.tagName);
   });
 }
