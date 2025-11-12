@@ -1,13 +1,16 @@
 mod markdown;
 mod config;
+mod file_watcher;
 
 use markdown::{render_markdown_line, LineRenderResult, RenderRequest};
 use config::{ThemeConfig, AppConfig, initialize_loom_dir, load_app_config, save_app_config,
              load_theme, list_themes, import_theme, export_theme, get_loom_dir,
              get_default_dark_theme_config, get_default_light_theme_config};
+use file_watcher::{FileWatcherStateHandle, create_watcher_state};
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use tauri::State;
 
 // File tree structures
 #[derive(Debug, Serialize, Deserialize)]
@@ -316,6 +319,33 @@ fn move_path(source_path: String, dest_dir_path: String) -> Result<String, Strin
     Ok(new_path)
 }
 
+// File watching commands
+
+/// Start watching a directory for file system changes
+#[tauri::command]
+fn start_watching_directory(
+    path: String,
+    app_handle: tauri::AppHandle,
+    watcher_state: State<FileWatcherStateHandle>,
+) -> Result<(), String> {
+    let mut state = watcher_state.lock()
+        .map_err(|e| format!("Failed to acquire watcher lock: {}", e))?;
+
+    state.start_watching(&path, app_handle)
+}
+
+/// Stop watching the current directory
+#[tauri::command]
+fn stop_watching_directory(
+    watcher_state: State<FileWatcherStateHandle>,
+) -> Result<(), String> {
+    let mut state = watcher_state.lock()
+        .map_err(|e| format!("Failed to acquire watcher lock: {}", e))?;
+
+    state.stop_watching();
+    Ok(())
+}
+
 // Theme and config commands
 
 /// Initialize the .loom directory structure
@@ -423,6 +453,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(create_watcher_state())
         .invoke_handler(tauri::generate_handler![
             render_markdown,
             render_markdown_batch,
@@ -435,6 +466,8 @@ pub fn run() {
             count_folder_contents,
             rename_path,
             move_path,
+            start_watching_directory,
+            stop_watching_directory,
             init_loom_dir,
             get_loom_directory,
             load_config,

@@ -5,6 +5,7 @@
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn, type Event } from "@tauri-apps/api/event";
 import type { FileEntry } from "../core/types";
 import { fileTree, sidebar, explorerHeader } from "../core/dom";
 import { state } from "../core/state";
@@ -15,6 +16,76 @@ import { hideWelcomeScreen } from "../ui/welcome-screen";
 
 // Track expanded folders to preserve state during refresh
 export const expandedFolders = new Set<string>();
+
+// Store the event listener unlisten function
+let fileSystemEventUnlisten: UnlistenFn | null = null;
+
+/**
+ * Interface for file system events from Rust backend
+ */
+interface FileSystemEvent {
+  event_type: string;
+  path: string;
+}
+
+/**
+ * Setup file system event listener
+ */
+async function setupFileSystemListener() {
+  // Remove existing listener if any
+  if (fileSystemEventUnlisten) {
+    fileSystemEventUnlisten();
+    fileSystemEventUnlisten = null;
+  }
+
+  // Listen for file system change events from Rust backend
+  fileSystemEventUnlisten = await listen<FileSystemEvent>(
+    "file-system-change",
+    (event: Event<FileSystemEvent>) => {
+      console.log("File system change detected:", event.payload);
+      // Refresh the file tree to reflect changes
+      refreshFileTree();
+    }
+  );
+}
+
+/**
+ * Start watching the current folder for file system changes
+ */
+async function startWatchingFolder(folderPath: string) {
+  try {
+    // Stop watching any previous folder first
+    await stopWatchingFolder();
+
+    // Start watching the new folder
+    await invoke("start_watching_directory", { path: folderPath });
+    console.log("Started watching folder:", folderPath);
+
+    // Setup the event listener
+    await setupFileSystemListener();
+  } catch (error) {
+    console.error("Error starting file watcher:", error);
+  }
+}
+
+/**
+ * Stop watching the current folder
+ */
+async function stopWatchingFolder() {
+  try {
+    // Remove event listener
+    if (fileSystemEventUnlisten) {
+      fileSystemEventUnlisten();
+      fileSystemEventUnlisten = null;
+    }
+
+    // Stop the watcher on Rust side
+    await invoke("stop_watching_directory");
+    console.log("Stopped watching folder");
+  } catch (error) {
+    console.error("Error stopping file watcher:", error);
+  }
+}
 
 /**
  * Update the explorer header to show the current folder name
@@ -43,6 +114,8 @@ export async function openFolder() {
       state.currentFolder = selected;
       updateExplorerHeader();
       await loadFileTree(selected);
+      // Start watching the folder for file system changes
+      await startWatchingFolder(selected);
       // Reinitialize theme system for the new folder
       await reinitializeThemeForFolder();
       // Reinitialize settings for the new folder
