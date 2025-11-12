@@ -17,15 +17,135 @@ import { saveFile } from "../file-operations";
 import { markCurrentTabDirty, updateCurrentTabContent, closeActiveTab } from "../tabs/tabs";
 import { getFirstTextNode, isLineInsideBlock } from "./editor-utils";
 import { handleEnterKey, handleBackspaceKey, handleDeleteKey, handleTabKey } from "./editor-keys";
+import { invoke } from "@tauri-apps/api/core";
+import { getSettings } from "../settings/settings-manager";
+
+/**
+ * Convert a blob to base64 string
+ */
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = (reader.result as string).split(",")[1]; // Remove data:image/png;base64, prefix
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Handle image paste from clipboard
+ */
+async function handleImagePaste(blob: Blob) {
+  try {
+    // Convert blob to base64
+    const base64Data = await blobToBase64(blob);
+
+    // Get settings to determine save directory
+    const settings = await getSettings();
+    const imageSaveFolder = settings.custom_settings?.imageSaveFolder || state.currentFolder || ".";
+
+    // Save image via Rust backend
+    const imagePath = await invoke<string>("save_image_from_clipboard", {
+      base64Data,
+      saveDir: imageSaveFolder,
+      filenamePrefix: "pasted",
+    });
+
+    // Get current selection and cursor position
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const currentLineNum = getCurrentLineNumber();
+    const currentLine = editor.childNodes[currentLineNum] as HTMLElement;
+
+    if (!currentLine) return;
+
+    // Find cursor position in current line
+    const preRange = range.cloneRange();
+    preRange.selectNodeContents(currentLine);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    const cursorPos = preRange.toString().length;
+
+    const currentText = currentLine.getAttribute("data-raw") || "";
+    const beforeCursor = currentText.substring(0, cursorPos);
+    const afterCursor = currentText.substring(cursorPos);
+
+    // Generate relative path if possible
+    let relativeImagePath = imagePath;
+    if (state.currentFile) {
+      const currentFileDir = state.currentFile.substring(0, state.currentFile.lastIndexOf("/"));
+      if (imagePath.startsWith(currentFileDir)) {
+        relativeImagePath = imagePath.substring(currentFileDir.length + 1);
+      } else if (state.currentFolder && imagePath.startsWith(state.currentFolder)) {
+        relativeImagePath = imagePath.substring(state.currentFolder.length + 1);
+      }
+    }
+
+    // Insert markdown image syntax
+    const imageMarkdown = `![image](${relativeImagePath})`;
+    const newText = beforeCursor + imageMarkdown + afterCursor;
+    currentLine.setAttribute("data-raw", newText);
+
+    // Re-render the line
+    const allLines = getAllLines();
+    const html = await renderMarkdownLine(newText, true, currentLineNum, allLines);
+    currentLine.innerHTML = html;
+    currentLine.classList.add("editing");
+
+    // Position cursor after inserted image markdown
+    const newCursorPos = beforeCursor.length + imageMarkdown.length;
+    const textNode = getFirstTextNode(currentLine);
+    if (textNode) {
+      const newRange = document.createRange();
+      const newSelection = window.getSelection();
+      const offset = Math.min(newCursorPos, textNode.textContent?.length || 0);
+      newRange.setStart(textNode, offset);
+      newRange.collapse(true);
+      newSelection?.removeAllRanges();
+      newSelection?.addRange(newRange);
+    }
+
+    // Update state
+    state.content = getEditorContent();
+    updateStatistics(state.content);
+    updateCurrentTabContent(state.content);
+    markCurrentTabDirty();
+
+    console.log(`Image pasted and saved to: ${imagePath}`);
+  } catch (error) {
+    console.error("Failed to paste image:", error);
+    alert(`Failed to paste image: ${error}`);
+  }
+}
 
 /**
  * Handle paste events - insert pasted text properly into editor structure
+ * Supports both text and image pasting
  */
 export async function handlePaste(e: ClipboardEvent) {
   e.preventDefault();
 
   const clipboardData = e.clipboardData;
   if (!clipboardData) return;
+
+  // Check for image data first
+  const items = clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+
+    // Handle image paste
+    if (item.type.startsWith("image/")) {
+      const blob = item.getAsFile();
+      if (blob) {
+        await handleImagePaste(blob);
+        return;
+      }
+    }
+  }
 
   // Get pasted text (prefer plain text for markdown)
   const pastedText = clipboardData.getData("text/plain");

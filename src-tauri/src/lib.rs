@@ -11,6 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use base64::{engine::general_purpose, Engine as _};
 
 // File tree structures
 #[derive(Debug, Serialize, Deserialize)]
@@ -319,6 +320,46 @@ fn move_path(source_path: String, dest_dir_path: String) -> Result<String, Strin
     Ok(new_path)
 }
 
+// Save image from base64 data to disk
+#[tauri::command]
+fn save_image_from_clipboard(
+    base64_data: String,
+    save_dir: String,
+    filename_prefix: Option<String>,
+) -> Result<String, String> {
+    // Decode base64 data
+    let image_data = general_purpose::STANDARD
+        .decode(&base64_data)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    // Create save directory path
+    let save_dir_path = PathBuf::from(&save_dir);
+
+    // Create directory if it doesn't exist
+    if !save_dir_path.exists() {
+        fs::create_dir_all(&save_dir_path)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    // Generate filename with timestamp
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+
+    let prefix = filename_prefix.unwrap_or_else(|| "image".to_string());
+    let filename = format!("{}-{}.png", prefix, timestamp);
+    let file_path = save_dir_path.join(&filename);
+
+    // Write image data to file
+    fs::write(&file_path, image_data)
+        .map_err(|e| format!("Failed to write image file: {}", e))?;
+
+    let full_path = file_path.to_string_lossy().to_string();
+    println!("Image saved successfully to: {:?}", full_path);
+    Ok(full_path)
+}
+
 // File watching commands
 
 /// Start watching a directory for file system changes
@@ -466,6 +507,7 @@ pub fn run() {
             count_folder_contents,
             rename_path,
             move_path,
+            save_image_from_clipboard,
             start_watching_directory,
             stop_watching_directory,
             init_loom_dir,

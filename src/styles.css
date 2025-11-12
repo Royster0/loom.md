@@ -1244,6 +1244,26 @@ a:hover {
   border-color: var(--accent-color);
 }
 
+.settings-input {
+  width: 100%;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.settings-input:hover {
+  border-color: var(--accent-color);
+}
+
+.settings-input:focus {
+  border-color: var(--accent-color);
+}
+
 .settings-select option {
   background-color: var(--bg-secondary);
   color: var(--text-primary);

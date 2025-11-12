@@ -8,7 +8,7 @@ import { state } from "../core/state";
 import { KeybindAction } from "../core/types";
 import { switchTheme, importTheme, populateThemeSelector } from "./theme";
 import { KEYBIND_ACTIONS, startRecordingKeybind, handleGlobalKeybind } from "./keybinds";
-import { saveSettings, applyStatusBarVisibility } from "./settings-manager";
+import { saveSettings, applyStatusBarVisibility, getSettings, updateCustomSetting } from "./settings-manager";
 
 // DOM element references
 const settingsModal = document.getElementById("settings-modal") as HTMLElement;
@@ -16,6 +16,7 @@ const settingsCloseBtn = document.getElementById("settings-close") as HTMLButton
 const settingsThemeSelector = document.getElementById("settings-theme-selector") as HTMLSelectElement;
 const settingsImportThemeBtn = document.getElementById("settings-import-theme") as HTMLButtonElement;
 const settingsStatusBarToggle = document.getElementById("settings-status-bar-toggle") as HTMLInputElement;
+const settingsImageFolderInput = document.getElementById("settings-image-folder") as HTMLInputElement;
 const settingsConfirmFileDeleteToggle = document.getElementById("settings-confirm-file-delete") as HTMLInputElement;
 const settingsConfirmFolderDeleteToggle = document.getElementById("settings-confirm-folder-delete") as HTMLInputElement;
 const keybindsList = document.getElementById("keybinds-list") as HTMLElement;
@@ -97,6 +98,14 @@ export function setupSettingsEventListeners(): void {
     });
   }
 
+  // Image folder input
+  if (settingsImageFolderInput) {
+    settingsImageFolderInput.addEventListener("change", async () => {
+      const folder = settingsImageFolderInput.value.trim() || ".";
+      await updateCustomSetting("imageSaveFolder", folder);
+    });
+  }
+
   // Escape key to close
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !settingsModal.classList.contains("hidden")) {
@@ -111,7 +120,7 @@ export function setupSettingsEventListeners(): void {
 /**
  * Open settings modal
  */
-export function openSettings(): void {
+export async function openSettings(): Promise<void> {
   settingsModal.classList.remove("hidden");
 
   // Update theme selector to current theme
@@ -119,6 +128,13 @@ export function openSettings(): void {
 
   // Update status bar toggle
   settingsStatusBarToggle.checked = state.statusBarVisible;
+
+  // Load and update image folder setting
+  if (settingsImageFolderInput) {
+    const config = await getSettings();
+    const imageSaveFolder = config.custom_settings?.imageSaveFolder || ".";
+    settingsImageFolderInput.value = imageSaveFolder;
+  }
 
   // Update delete confirmation toggles
   if (settingsConfirmFileDeleteToggle) {
