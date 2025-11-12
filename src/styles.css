@@ -809,6 +809,40 @@ code {
   border: 1px solid var(--border-color);
 }
 
+/* Images */
+.markdown-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.markdown-image-editing {
+  max-width: 80%;
+  height: auto;
+  border-radius: 4px;
+  margin: 4px 0;
+  display: inline-block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  vertical-align: middle;
+}
+
+.image-inline {
+  display: inline-block;
+  position: relative;
+  vertical-align: middle;
+}
+
+.image-syntax {
+  display: inline;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+
 /* Code blocks */
 .code-block-start,
 .code-block-end {

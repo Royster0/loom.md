@@ -16,9 +16,10 @@ static ITALIC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\*(.+?)\*").unwrap());
 static ITALIC_UNDERSCORE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"_(.+?)_").unwrap());
 static STRIKE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"~~(.+?)~~").unwrap());
 static CODE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"`([^`]+)`").unwrap());
+static IMAGE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"!\[([^\]]*)\]\(([^\)]+)\)").unwrap());
 static LINK_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[([^\]]+)\]\(([^\)]+)\)").unwrap());
 
-/// Render inline markdown (bold, italic, code, links, etc.)
+/// Render inline markdown (bold, italic, code, links, images, etc.)
 ///
 /// Note: LaTeX rendering is still handled on the frontend via KaTeX
 pub fn render_inline_markdown(text: &str) -> String {
@@ -48,6 +49,11 @@ pub fn render_inline_markdown(text: &str) -> String {
 
     // Inline code
     result = CODE_RE.replace_all(&result, "<code>$1</code>").to_string();
+
+    // Images (must come before links to avoid conflict)
+    result = IMAGE_RE
+        .replace_all(&result, "<img src=\"$2\" alt=\"$1\" class=\"markdown-image\" />")
+        .to_string();
 
     // Links
     result = LINK_RE
@@ -90,6 +96,12 @@ pub fn render_inline_markdown_with_markers(text: &str) -> String {
     // Inline code
     result = CODE_RE
         .replace_all(&result, "<code>`$1`</code>")
+        .to_string();
+
+    // Images (must come before links to avoid conflict)
+    // In editing mode, show syntax but still render the image inline
+    result = IMAGE_RE
+        .replace_all(&result, "<span class=\"image-inline\"><img src=\"$2\" alt=\"$1\" class=\"markdown-image-editing\" /><span class=\"image-syntax\">![$1]($2)</span></span>")
         .to_string();
 
     // Links
