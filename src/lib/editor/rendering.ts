@@ -5,7 +5,7 @@
  * and KaTeX for LaTeX math rendering on the frontend.
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import katex from "katex";
 import { RenderRequest, LineRenderResult } from "../core/types";
 import { editor } from "../core/dom";
@@ -52,6 +52,37 @@ export function renderLatex(text: string): string {
   });
 
   return text;
+}
+
+/**
+ * Convert image file paths to Tauri asset protocol URLs
+ * @param html - HTML string containing img tags
+ * @returns HTML with converted image paths
+ */
+export function convertImagePaths(html: string): string {
+  // Quick check: if no img tag, skip processing
+  if (!html.includes("<img")) {
+    return html;
+  }
+
+  return html.replace(
+    /<img([^>]*?)src="([^"]+)"([^>]*?)>/g,
+    (match, before, src, after) => {
+      try {
+        // Skip if already using a protocol (http://, https://, data:, etc.)
+        if (src.match(/^[a-z]+:/i)) {
+          return match;
+        }
+
+        // Convert file path to Tauri asset URL
+        const assetUrl = convertFileSrc(src);
+        return `<img${before}src="${assetUrl}"${after}>`;
+      } catch (e) {
+        console.error("Error converting image path:", e);
+        return match;
+      }
+    }
+  );
 }
 
 /**
@@ -121,12 +152,17 @@ export async function renderMarkdownLine(
       request,
     });
 
+    let html = result.html;
+
+    // Convert image paths to Tauri asset URLs
+    html = convertImagePaths(html);
+
     // Only render LaTeX when NOT editing to preserve the original $ markers
     if (isEditing) {
-      return result.html;
+      return html;
     }
 
-    return renderLatexInHtml(result.html);
+    return renderLatexInHtml(html);
   } catch (error) {
     console.error("Error rendering markdown:", error);
     return escapeHtml(line);
@@ -146,13 +182,20 @@ export async function renderMarkdownBatch(
       requests,
     });
 
-    // Post-process all results to add LaTeX rendering (only for non-editing lines)
-    return results.map((result: LineRenderResult, index: number) => ({
-      ...result,
-      html: requests[index].is_editing
-        ? result.html
-        : renderLatexInHtml(result.html),
-    }));
+    // Post-process all results to convert image paths and add LaTeX rendering
+    return results.map((result: LineRenderResult, index: number) => {
+      let html = convertImagePaths(result.html);
+
+      // Only for non-editing lines, also render LaTeX
+      if (!requests[index].is_editing) {
+        html = renderLatexInHtml(html);
+      }
+
+      return {
+        ...result,
+        html,
+      };
+    });
   } catch (error) {
     console.error("Error batch rendering markdown:", error);
     return requests.map((req) => ({
