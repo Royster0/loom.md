@@ -16,7 +16,9 @@
         "title": "Markdown Editor",
         "width": 800,
         "height": 600,
-        "decorations": false
+        "decorations": false,
+        "fileDropEnabled": false,
+        "acceptFirstMouse": true
       }
     ],
     "security": {
