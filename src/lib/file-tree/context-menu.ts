@@ -4,8 +4,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
-import { refreshAndRevealFile, refreshFileTree } from "./file-tree";
+import { refreshAndRevealFile, refreshFileTree } from "./file-tree-core";
 import { loadFileContent, newFile } from "../file-operations";
+import { getFilename, getPathSeparator, joinPath } from "../utils/path-utils";
 
 interface ContextMenuItem {
   label: string;
@@ -285,8 +286,7 @@ async function createNewFile(parentPath: string | null, isMd: boolean = true) {
     ? `${sanitizedName}.md`
     : sanitizedName;
 
-  const separator = parentPath.includes("\\") ? "\\" : "/";
-  const filePath = `${parentPath}${separator}${fullFileName}`;
+  const filePath = joinPath(parentPath, fullFileName);
 
   try {
     console.log("Creating file:", filePath);
@@ -333,8 +333,7 @@ async function createNewFolder(parentPath: string | null) {
     return;
   }
 
-  const separator = parentPath.includes("\\") ? "\\" : "/";
-  const folderPath = `${parentPath}${separator}${sanitizedName}`;
+  const folderPath = joinPath(parentPath, sanitizedName);
 
   try {
     await invoke("create_folder", { path: folderPath });
@@ -353,8 +352,7 @@ async function createNewFolder(parentPath: string | null) {
  */
 async function renameItem(itemPath: string, isDir: boolean) {
   // Get current name
-  const separator = itemPath.includes("\\") ? "\\" : "/";
-  const currentName = itemPath.split(separator).pop() || "";
+  const currentName = getFilename(itemPath);
 
   // Prompt for new name
   const newName = prompt(
@@ -403,8 +401,7 @@ async function deleteItem(itemPath: string, isDir: boolean) {
   console.log("Is directory:", isDir);
   console.log("Call stack timestamp:", Date.now());
 
-  const separator = itemPath.includes("\\") ? "\\" : "/";
-  const itemName = itemPath.split(separator).pop() || "";
+  const itemName = getFilename(itemPath);
 
   if (isDir) {
     // Check folder contents

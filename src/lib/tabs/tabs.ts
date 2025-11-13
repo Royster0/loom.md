@@ -7,6 +7,7 @@ import { editor } from "../core/dom";
 import { setEditorContent } from "../editor/rendering";
 import { saveFile } from "../file-operations";
 import { createNewWindow } from "../ui/window-controls";
+import { getFilename } from "../utils/path-utils";
 
 export interface Tab {
   id: string;
@@ -32,7 +33,7 @@ function generateTabId(): string {
  */
 export function getTabDisplayName(tab: Tab): string {
   if (tab.filePath) {
-    return tab.filePath.split(/[\\/]/).pop() || "Untitled.md";
+    return getFilename(tab.filePath) || "Untitled.md";
   }
   return "Untitled.md";
 }

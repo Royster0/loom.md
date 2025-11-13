@@ -10,6 +10,7 @@ import { updateStatistics } from "./ui/ui";
 import { refreshFileTree } from "./file-tree/file-tree";
 import { hideWelcomeScreen } from "./ui/welcome-screen";
 import { openInTab, markCurrentTabClean } from "./tabs/tabs";
+import { isImagePath, getFilename } from "./utils/path-utils";
 
 /**
  * Save the current file
@@ -97,17 +98,6 @@ export async function openFile(): Promise<void> {
 }
 
 /**
- * Check if a file is an image based on extension
- * @param filePath - Path to the file
- * @returns True if the file is an image
- */
-function isImageFile(filePath: string): boolean {
-  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico'];
-  const lowerPath = filePath.toLowerCase();
-  return imageExtensions.some(ext => lowerPath.endsWith(ext));
-}
-
-/**
  * Load file content into the editor
  * @param filePath - Path to the file to load
  */
@@ -116,11 +106,11 @@ export async function loadFileContent(filePath: string): Promise<void> {
     console.log("loadFileContent called with path:", filePath);
 
     // Check if this is an image file
-    if (isImageFile(filePath)) {
+    if (isImagePath(filePath)) {
       console.log("Detected image file, loading as image viewer");
 
       // Create image viewer markdown content
-      const imageFileName = filePath.split(/[/\\]/).pop() || 'image';
+      const imageFileName = getFilename(filePath);
       const content = `# ${imageFileName}\n\n![${imageFileName}](${filePath})`;
 
       // Open image in a tab with the markdown

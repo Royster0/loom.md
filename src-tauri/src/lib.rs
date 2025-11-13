@@ -456,6 +456,16 @@ fn save_image_from_clipboard(
     Ok(full_path)
 }
 
+// Path utility commands
+
+/// Check if a file path is an image based on extension
+#[tauri::command]
+fn is_image_file(path: String) -> bool {
+    let image_extensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".ico"];
+    let lower_path = path.to_lowercase();
+    image_extensions.iter().any(|ext| lower_path.ends_with(ext))
+}
+
 // File watching commands
 
 /// Start watching a directory for file system changes
@@ -605,6 +615,7 @@ pub fn run() {
             move_path,
             copy_path,
             save_image_from_clipboard,
+            is_image_file,
             start_watching_directory,
             stop_watching_directory,
             init_loom_dir,
