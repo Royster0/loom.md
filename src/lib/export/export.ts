@@ -245,7 +245,7 @@ export async function exportToHTML(): Promise<void> {
 }
 
 /**
- * Export current document to PDF (saves as print-ready HTML)
+ * Export current document to PDF (saves HTML and opens in browser)
  */
 export async function exportToPDF(): Promise<void> {
   try {
@@ -427,13 +427,16 @@ export async function exportToPDF(): Promise<void> {
 </body>
 </html>`;
 
+    // Save the HTML file
     await writeTextFile(filePath, htmlDocument);
 
+    // Automatically open the file in default browser using the opener plugin
+    await invoke("plugin:opener|open", { path: filePath });
+
     // Show success message with instructions
-    const message = `Successfully exported to ${filePath}\n\nTo convert to PDF:\n1. Open the HTML file in your browser\n2. Press Ctrl+P (Cmd+P on Mac)\n3. Select "Save as PDF" as the printer\n4. Click Save`;
-    alert(message);
+    alert(`File saved and opened in your browser!\n\nTo save as PDF:\n1. Press Ctrl+P (Cmd+P on Mac)\n2. Select "Save as PDF"\n3. Click Save`);
   } catch (error) {
     console.error("Error exporting to PDF:", error);
-    alert(`Failed to export to PDF: ${error}`);
+    alert(`Failed to export: ${error}`);
   }
 }
