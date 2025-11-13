@@ -16,6 +16,7 @@ import { initFileTree } from "./lib/file-tree/file-tree";
 import { initWelcomeScreen, hideWelcomeScreen } from "./lib/ui/welcome-screen";
 import { initTabs, openInTab, closeTab, getTabs } from "./lib/tabs/tabs";
 import { readTextFile } from "@tauri-apps/plugin-fs";
+import { createSearchModal } from "./lib/search";
 
 /**
  * Check if a file path was passed via URL parameters and open it
@@ -67,6 +68,7 @@ async function initialize() {
   initWindowControls();
   initFileTree();
   initWelcomeScreen();
+  createSearchModal();
 
   // Initialize UI
   updateStatistics(state.content);
