@@ -431,7 +431,7 @@ export async function exportToPDF(): Promise<void> {
     await writeTextFile(filePath, htmlDocument);
 
     // Automatically open the file in default browser using the opener plugin
-    await invoke("plugin:opener|open", { path: filePath });
+    await invoke("plugin:opener|open_path", { path: filePath });
 
     // Show success message with instructions
     alert(`File saved and opened in your browser!\n\nTo save as PDF:\n1. Press Ctrl+P (Cmd+P on Mac)\n2. Select "Save as PDF"\n3. Click Save`);
