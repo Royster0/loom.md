@@ -17,15 +17,221 @@ import { saveFile } from "../file-operations";
 import { markCurrentTabDirty, updateCurrentTabContent, closeActiveTab } from "../tabs/tabs";
 import { getFirstTextNode, isLineInsideBlock } from "./editor-utils";
 import { handleEnterKey, handleBackspaceKey, handleDeleteKey, handleTabKey } from "./editor-keys";
+import { invoke } from "@tauri-apps/api/core";
+import { getSettings } from "../settings/settings-manager";
+
+/**
+ * Convert a blob to base64 string
+ */
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      try {
+        const result = reader.result as string;
+        if (!result || !result.includes(",")) {
+          reject(new Error("Invalid data URL format"));
+          return;
+        }
+        const base64 = result.split(",")[1]; // Remove data:image/png;base64, prefix
+        if (!base64) {
+          reject(new Error("Failed to extract base64 data"));
+          return;
+        }
+        resolve(base64);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = () => reject(new Error("Failed to read blob"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Insert image markdown at cursor position
+ * @param imagePath - Path to the image file
+ * @param altText - Alt text for the image
+ */
+async function insertImageAtCursor(imagePath: string, altText: string = "image") {
+  // Get current selection and cursor position
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+
+  const range = selection.getRangeAt(0);
+  const currentLineNum = getCurrentLineNumber();
+  const currentLine = editor.childNodes[currentLineNum] as HTMLElement;
+
+  if (!currentLine) return;
+
+  // Find cursor position in current line
+  const preRange = range.cloneRange();
+  preRange.selectNodeContents(currentLine);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  const cursorPos = preRange.toString().length;
+
+  const currentText = currentLine.getAttribute("data-raw") || "";
+  const beforeCursor = currentText.substring(0, cursorPos);
+  const afterCursor = currentText.substring(cursorPos);
+
+  // Insert markdown image syntax with absolute path
+  const imageMarkdown = `![${altText}](${imagePath})`;
+  const newText = beforeCursor + imageMarkdown + afterCursor;
+  currentLine.setAttribute("data-raw", newText);
+
+  // Re-render the line
+  const allLines = getAllLines();
+  const html = await renderMarkdownLine(newText, true, currentLineNum, allLines);
+  currentLine.innerHTML = html;
+  currentLine.classList.add("editing");
+
+  // Position cursor after inserted image markdown
+  const newCursorPos = beforeCursor.length + imageMarkdown.length;
+  const textNode = getFirstTextNode(currentLine);
+  if (textNode) {
+    const newRange = document.createRange();
+    const newSelection = window.getSelection();
+    const offset = Math.min(newCursorPos, textNode.textContent?.length || 0);
+    newRange.setStart(textNode, offset);
+    newRange.collapse(true);
+    newSelection?.removeAllRanges();
+    newSelection?.addRange(newRange);
+  }
+
+  // Update state
+  state.content = getEditorContent();
+  updateStatistics(state.content);
+  updateCurrentTabContent(state.content);
+  markCurrentTabDirty();
+}
+
+/**
+ * Handle image paste from clipboard
+ */
+async function handleImagePaste(blob: Blob) {
+  try {
+    // Validate blob
+    if (!blob || blob.size === 0) {
+      throw new Error("Invalid or empty image data");
+    }
+
+    // Check if blob is too large (e.g., > 10MB)
+    if (blob.size > 10 * 1024 * 1024) {
+      throw new Error("Image is too large (max 10MB)");
+    }
+
+    // Convert blob to base64
+    const base64Data = await blobToBase64(blob);
+
+    // Get settings to determine save directory
+    const settings = await getSettings();
+    let imageSaveFolder = settings.custom_settings?.imageSaveFolder || ".";
+
+    // Resolve save directory relative to current folder
+    let resolvedSaveDir = state.currentFolder || ".";
+    if (imageSaveFolder && imageSaveFolder !== ".") {
+      // Remove leading ./ if present
+      imageSaveFolder = imageSaveFolder.replace(/^\.\//, "");
+
+      // Build absolute path
+      if (state.currentFolder) {
+        resolvedSaveDir = `${state.currentFolder}/${imageSaveFolder}`;
+      } else {
+        resolvedSaveDir = imageSaveFolder;
+      }
+    }
+
+    // Save image via Rust backend
+    const imagePath = await invoke<string>("save_image_from_clipboard", {
+      base64Data,
+      saveDir: resolvedSaveDir,
+      filenamePrefix: "pasted",
+    });
+
+    // Insert image at cursor
+    await insertImageAtCursor(imagePath, "image");
+
+    console.log(`Image pasted and saved to: ${imagePath}`);
+  } catch (error) {
+    console.error("Failed to paste image:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    alert(`Failed to paste image: ${errorMsg}`);
+  }
+}
+
+/**
+ * Check if a file path is an image
+ */
+function isImagePath(path: string): boolean {
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+  const lowerPath = path.toLowerCase();
+  return imageExtensions.some(ext => lowerPath.endsWith(ext));
+}
+
+/**
+ * Handle drop events - insert dropped images into editor
+ */
+async function handleDrop(e: DragEvent) {
+  try {
+    const dataTransfer = e.dataTransfer;
+    if (!dataTransfer) return;
+
+    // Check for files (external drop, e.g., from File Explorer)
+    if (dataTransfer.files && dataTransfer.files.length > 0) {
+      for (const file of Array.from(dataTransfer.files)) {
+        // Only handle image files
+        if (file.type.startsWith("image/")) {
+          console.log("Dropped external image file:", file.name);
+
+          // Read file as blob and handle like paste
+          await handleImagePaste(file);
+        }
+      }
+      return;
+    }
+
+    // Check for file path (from file tree)
+    const filePath = dataTransfer.getData("text/plain");
+    if (filePath && isImagePath(filePath)) {
+      console.log("Dropped image from file tree:", filePath);
+
+      // Get filename for alt text
+      const fileName = filePath.split(/[/\\]/).pop() || "image";
+
+      // Insert image at drop position
+      await insertImageAtCursor(filePath, fileName);
+    }
+  } catch (error) {
+    console.error("Failed to handle drop:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    alert(`Failed to insert dropped image: ${errorMsg}`);
+  }
+}
 
 /**
  * Handle paste events - insert pasted text properly into editor structure
+ * Supports both text and image pasting
  */
 export async function handlePaste(e: ClipboardEvent) {
   e.preventDefault();
 
   const clipboardData = e.clipboardData;
   if (!clipboardData) return;
+
+  // Check for image data first
+  const items = clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+
+    // Handle image paste
+    if (item.type.startsWith("image/")) {
+      const blob = item.getAsFile();
+      if (blob) {
+        await handleImagePaste(blob);
+        return;
+      }
+    }
+  }
 
   // Get pasted text (prefer plain text for markdown)
   const pastedText = clipboardData.getData("text/plain");
@@ -387,8 +593,86 @@ export function initEditorEvents() {
   // Paste event
   editor.addEventListener("paste", handlePaste);
 
+  // Drag and drop events
+  editor.addEventListener("dragover", (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    editor.classList.add("drag-over");
+  });
+
+  editor.addEventListener("dragleave", (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only remove drag-over if we're actually leaving the editor
+    const target = e.target as HTMLElement;
+    if (target === editor) {
+      editor.classList.remove("drag-over");
+    }
+  });
+
+  editor.addEventListener("drop", async (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    editor.classList.remove("drag-over");
+
+    await handleDrop(e);
+  });
+
   // Cursor movement
-  editor.addEventListener("click", handleCursorChange);
+  editor.addEventListener("click", async (e) => {
+    const target = e.target as HTMLElement;
+
+    // Handle image clicks - switch to edit mode to edit markdown
+    if (target.tagName === "IMG" && target.classList.contains("markdown-image")) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Find the parent line
+      let lineElement = target.parentElement;
+      while (lineElement && !lineElement.classList.contains("editor-line")) {
+        lineElement = lineElement.parentElement;
+      }
+
+      if (!lineElement) return;
+
+      // Get line number
+      const lineNum = parseInt(lineElement.getAttribute("data-line") || "0");
+      state.currentLine = lineNum;
+
+      // Get the raw text and find the image markdown
+      const rawText = lineElement.getAttribute("data-raw") || "";
+      const imageMatch = rawText.match(/!\[([^\]]*)\]\(([^\)]+)\)/);
+
+      if (imageMatch) {
+        // Render line in edit mode
+        const allLines = getAllLines();
+        const html = await renderMarkdownLine(rawText, true, lineNum, allLines);
+        lineElement.innerHTML = html;
+        lineElement.classList.add("editing");
+
+        // Position cursor at the start of the image markdown
+        const imageStartPos = imageMatch.index || 0;
+        const textNode = getFirstTextNode(lineElement);
+
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          const range = document.createRange();
+          const selection = window.getSelection();
+          const offset = Math.min(imageStartPos, textNode.textContent?.length || 0);
+
+          range.setStart(textNode, offset);
+          range.collapse(true);
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }
+      }
+
+      return;
+    }
+
+    // Normal cursor change handling
+    await handleCursorChange();
+  });
+
   editor.addEventListener("keyup", handleCursorChange);
 
   // Focus - put cursor at end if clicking in empty space

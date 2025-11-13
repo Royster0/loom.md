@@ -12,13 +12,33 @@ const settingsStatusBarToggle = document.getElementById("settings-status-bar-tog
 const statusBar = document.querySelector(".status-bar") as HTMLElement;
 
 /**
- * Load settings from backend
+ * Get current settings from backend
  */
-export async function loadSettings(): Promise<void> {
+export async function getSettings(): Promise<any> {
   try {
     const config = await invoke<any>("get_config", {
       folderPath: state.currentFolder
     });
+    return config;
+  } catch (error) {
+    console.error("Failed to get settings:", error);
+    return {
+      current_theme: "dark",
+      status_bar_visible: true,
+      confirm_file_delete: true,
+      confirm_folder_delete: true,
+      keybinds: {},
+      custom_settings: {}
+    };
+  }
+}
+
+/**
+ * Load settings from backend
+ */
+export async function loadSettings(): Promise<void> {
+  try {
+    const config = await getSettings();
 
     // Load status bar visibility
     if (config.status_bar_visible !== undefined) {
@@ -98,8 +118,11 @@ export async function reinitializeSettingsForFolder(): Promise<void> {
 /**
  * Save settings to backend
  */
-export async function saveSettings(): Promise<void> {
+export async function saveSettings(customSettings?: any): Promise<void> {
   try {
+    // Get current config to preserve custom_settings if not provided
+    const currentConfig = await getSettings();
+
     await invoke("update_config", {
       folderPath: state.currentFolder,
       config: {
@@ -108,11 +131,25 @@ export async function saveSettings(): Promise<void> {
         confirm_file_delete: state.confirmFileDelete,
         confirm_folder_delete: state.confirmFolderDelete,
         keybinds: state.keybinds,
-        custom_settings: {}
+        custom_settings: customSettings !== undefined ? customSettings : currentConfig.custom_settings || {}
       }
     });
   } catch (error) {
     console.error("Failed to save settings:", error);
+  }
+}
+
+/**
+ * Update custom settings field
+ */
+export async function updateCustomSetting(key: string, value: any): Promise<void> {
+  try {
+    const config = await getSettings();
+    const customSettings = config.custom_settings || {};
+    customSettings[key] = value;
+    await saveSettings(customSettings);
+  } catch (error) {
+    console.error("Failed to update custom setting:", error);
   }
 }
 

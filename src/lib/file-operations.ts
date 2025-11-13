@@ -4,7 +4,7 @@
 
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { state } from "./core/state";
 import { updateStatistics } from "./ui/ui";
 import { refreshFileTree } from "./file-tree/file-tree";
@@ -97,12 +97,48 @@ export async function openFile(): Promise<void> {
 }
 
 /**
+ * Check if a file is an image based on extension
+ * @param filePath - Path to the file
+ * @returns True if the file is an image
+ */
+function isImageFile(filePath: string): boolean {
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+  const lowerPath = filePath.toLowerCase();
+  return imageExtensions.some(ext => lowerPath.endsWith(ext));
+}
+
+/**
  * Load file content into the editor
  * @param filePath - Path to the file to load
  */
 export async function loadFileContent(filePath: string): Promise<void> {
   try {
     console.log("loadFileContent called with path:", filePath);
+
+    // Check if this is an image file
+    if (isImageFile(filePath)) {
+      console.log("Detected image file, loading as image viewer");
+
+      // Convert file path to asset URL
+      const assetUrl = convertFileSrc(filePath, 'asset');
+
+      // Create image viewer markdown content
+      const imageFileName = filePath.split(/[/\\]/).pop() || 'image';
+      const content = `# ${imageFileName}\n\n![${imageFileName}](${filePath})`;
+
+      // Open image in a tab with the markdown
+      await openInTab(filePath, content);
+
+      // Update UI
+      updateStatistics(content);
+
+      // Hide welcome screen
+      hideWelcomeScreen();
+
+      console.log("Image file loaded successfully:", filePath);
+      return;
+    }
+
     console.log("Attempting to read file...");
 
     // Try reading via Tauri command first (more reliable for files we just created)
