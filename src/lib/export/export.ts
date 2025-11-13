@@ -430,11 +430,17 @@ export async function exportToPDF(): Promise<void> {
     // Save the HTML file
     await writeTextFile(filePath, htmlDocument);
 
-    // Automatically open the file in default browser using the opener plugin
-    await invoke("plugin:opener|open_path", { path: filePath });
+    // Try to automatically open the file in default browser
+    try {
+      await invoke("plugin:opener|open_path", { path: filePath });
 
-    // Show success message with instructions
-    alert(`File saved and opened in your browser!\n\nTo save as PDF:\n1. Press Ctrl+P (Cmd+P on Mac)\n2. Select "Save as PDF"\n3. Click Save`);
+      // Show success message with instructions
+      alert(`File saved and opened in your browser!\n\nTo save as PDF:\n1. Press Ctrl+P (Cmd+P on Mac)\n2. Select "Save as PDF"\n3. Click Save`);
+    } catch (openError) {
+      // If auto-open fails, just show where the file was saved
+      console.warn("Could not auto-open file:", openError);
+      alert(`File saved successfully to:\n${filePath}\n\nTo save as PDF:\n1. Open this file in your browser\n2. Press Ctrl+P (Cmd+P on Mac)\n3. Select "Save as PDF"\n4. Click Save`);
+    }
   } catch (error) {
     console.error("Error exporting to PDF:", error);
     alert(`Failed to export: ${error}`);
