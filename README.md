@@ -1,142 +1,202 @@
-# Loom.md (in development)
+<h1 align="center">Loom.md</h1>
 
-A lightweight, flexible, minimal, and forever open-source knowledge base for all your thoughts
+<div align="center">
 
-## Development
+**A lightweight, fast, and flexible Markdown editor for knowledge-bases and note-taking**
 
-### Prerequisites
+[Features](#features) • [Installation](#installation) • [Documentation](#documentation) • [Contributing](#contributing)
 
-- **Node.js** (v18 or higher)
-- **Rust** (latest stable)
-- **System dependencies**:
-  - Linux: `webkit2gtk`, `libgtk-3-dev`, `libsoup-3.0`
-  - macOS: Xcode command line tools
-  - Windows: WebView2 (usually pre-installed)
+</div>
 
-### Setup
+
+## Features
+
+### Markdown Editing
+- **Live Preview**: See your formatted markdown as you type
+- **Dual Mode**: Toggle between editing and preview modes
+- **Syntax Highlighting**: Code blocks with proper syntax support
+- **Math Support**: LaTeX/KaTeX rendering for mathematical expressions
+- **GFM Support**: Full GitHub Flavored Markdown compatibility
+
+### File Management
+- **File Tree Navigation**: Visual folder browser with expand/collapse
+- **Multi-Tab Support**: Work on multiple files simultaneously
+- **Drag & Drop**: Drag files and images directly into the editor
+- **Multi-Select**: Select and manage multiple files at once
+- **Auto-Save**: Never lose your work
+- **File Watcher**: Automatic refresh when files change externally
+
+### Customization
+- **Theme System**: Built-in dark and light themes
+- **Custom Themes**: Import and create your own themes
+- **Configurable Settings**: Per-folder configuration support
+- **Keyboard Shortcuts**: Fully customizable keybindings
+
+### Rich Media
+- **Image Paste**: Paste images directly from clipboard
+- **Image Drag & Drop**: Drop images from file explorer
+- **Image Preview**: Inline image rendering
+- **Automatic Image Storage**: Configurable image save location
+
+### Performance
+- **Instant Startup**: Native performance with Tauri
+- **Low Memory**: Efficient Rust backend
+- **Parallel Rendering**: Multi-threaded markdown processing
+- **Optimized Bundles**: Tree-shaken, modular code architecture
+
+### Developer-Friendly
+- **Clean Architecture**: Well-organized, maintainable codebase
+- **TypeScript**: Type-safe frontend development
+- **Modular Design**: Single-responsibility modules
+- **Extensible**: Easy to add new features
+
+
+
+## Installation
+
+### Download Pre-built Binaries
+*(Coming soon)*
+
+Download the latest release for your platform from the [Releases](https://github.com/Royster0/Loom.md/releases) page.
+
+### Build from Source
+
+#### Prerequisites
+- [Node.js](https://nodejs.org/) v18 or higher
+- [Rust](https://www.rust-lang.org/) (latest stable)
+- Platform-specific dependencies:
+  - **Linux**: `webkit2gtk-4.1`, `libgtk-3-dev`, `libayatana-appindicator3-dev`
+    ```bash
+    # Ubuntu/Debian
+    sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
+    ```
+  - **macOS**: Xcode Command Line Tools
+    ```bash
+    xcode-select --install
+    ```
+  - **Windows**: WebView2 (usually pre-installed on Windows 10+)
+
+#### Build Steps
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd markdown-editor
+git clone https://github.com/Royster0/Loom.md.git
+cd Loom.md
 
 # Install dependencies
 npm install
 
 # Run in development mode
 npm run tauri dev
-```
 
-### Building
-
-```bash
 # Build for production
 npm run tauri build
 ```
 
 The compiled application will be in `src-tauri/target/release/`.
 
-## Open Source & Extensibility
 
-### Open Source Strategy
 
-This project is designed to be open-sourced with:
+## Documentation
 
-- **Permissive License**: MIT or Apache 2.0 (choose based on your preference)
-- **Clear Contributing Guidelines**: CONTRIBUTING.md with coding standards
-- **Issue Templates**: Bug reports and feature requests
-- **Documentation**: Comprehensive API docs for plugin developers
-- **Community**: Discord/forum for discussions
+- **[User Guide](docs/USER_GUIDE.md)** - Comprehensive feature guide
+- **[Development Guide](docs/DEVELOPMENT.md)** - Setup and workflow
+- **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture
+- **[Contributing](CONTRIBUTING.md)** - How to contribute
 
-### Extension Points
 
-The architecture provides several extension points:
 
-1. **Editor Commands**: Add custom toolbar buttons and commands
-2. **Markdown Processors**: Custom parsing and rendering
-3. **File Handlers**: Support for additional file formats
-4. **UI Components**: Inject custom panels and widgets
-5. **Keyboard Shortcuts**: Register custom key bindings
-6. **Event System**: Hook into editor lifecycle events
+## Contributing
 
-### Contributing Areas
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-Future contributors can focus on:
+### Quick Contribution Guide
 
-- Creating and sharing plugins
-- Designing themes
-- Improving markdown rendering
-- Adding export formats
-- Building integrations (GitHub, Dropbox, etc.)
-- Enhancing accessibility
-- Performance optimizations
-- Documentation and tutorials
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests and linting
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
-## Markdown Support
+### Development
 
-### Supported Syntax
+```bash
+# Install dependencies
+npm install
 
-- **Headings**: `# H1` through `###### H6`
-- **Emphasis**: `*italic*`, `**bold**`, `***bold italic***`
-- **Lists**: Unordered (`-`, `*`) and ordered (`1.`)
-- **Links**: `[text](url)`
-- **Images**: `![alt](url)`
-- **Code**: Inline `` `code` `` and fenced ` ```code blocks``` `
-- **Quotes**: `> blockquote`
-- **Tables**: GitHub Flavored Markdown tables
-- **Task Lists**: `- [ ]` and `- [x]`
-- **Horizontal Rules**: `---` or `***`
-- **HTML**: Raw HTML is supported
+# Run in development mode with hot reload
+npm run tauri dev
 
-### GitHub Flavored Markdown (GFM)
+# Build TypeScript
+npm run build
 
-The editor uses GFM mode, supporting:
+# Build the app
+npm run tauri build
+```
 
-- Autolinked URLs
-- Strikethrough: `~~text~~`
-- Tables with alignment
-- Task lists
-- Line breaks without double spaces
+### Tech Stack
 
-## Performance
+- **Frontend**: TypeScript + HTML + CSS
+- **Backend**: Rust
+- **Markdown Parser**: pulldown-cmark (fast CommonMark parser)
+- **Math Rendering**: KaTeX
+- **Build Tool**: Vite
+- **Desktop Framework**: Tauri 2.0
 
-- **Instant Startup**: Tauri apps start in milliseconds
-- **Low Memory**: Rust backend uses minimal resources
-- **Efficient Rendering**: Incremental markdown parsing
 
-## Security
+### Planned Features
+- Search and replace across files
+- Export to PDF/HTML
+- Plugin system
+- Git integration
+- Collaborative editing
+- Cloud sync integration
+- Advanced markdown extensions
+- Custom keyboard shortcut editor
+- Command palette
+- Split view editing
 
-- **Sandboxed**: Tauri security model restricts dangerous operations
-- **Permissions**: Explicit file system access only
-- **No Remote Code**: All code is local and verified
-- **Auto-updates**: Can be configured for secure updates
 
-## Roadmap
 
-### Version 1.0 (Current Foundation)
+## Known Issues
 
-- [x] File tree/navigation
-- [x] Settings panel
-- [ ] Plugin system implementation
-- [x] Theme system implementation
-- [ ] Export to PDF/HTML
-- [ ] Multi-tab support
-- [ ] Search and replace
-- [ ] Auto-save
-- [ ] Collaborative editing
-- [ ] Cloud sync
-- [ ] Plugin marketplace
+See the [Issues](https://github.com/Royster0/Loom.md/issues) page for known bugs and feature requests.
+
+
 
 ## License
 
-This project will be released under an open-source license (MIT or Apache 2.0).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Credits
 
-Built with:
 
-[Tauri](https://tauri.app/) - Desktop application framework
+## Acknowledgments
 
----
+Built with amazing open-source technologies:
 
-**Note**: This is a foundation release. The plugin and theme systems are architecturally ready but not yet implemented. Contributions welcome!
+- [Tauri](https://tauri.app/) - Build smaller, faster desktop apps
+- [pulldown-cmark](https://github.com/raphlinus/pulldown-cmark) - Fast CommonMark parser
+- [KaTeX](https://katex.org/) - Fast math typesetting
+- [Vite](https://vitejs.dev/) - Next generation frontend tooling
+
+
+
+## Contact & Support
+
+- **Issues**: [GitHub Issues](https://github.com/Royster0/Loom.md/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Royster0/Loom.md/discussions)
+
+
+
+<div align="center">
+
+[![Built with Tauri](https://img.shields.io/badge/Built%20with-Tauri-FFC131?logo=tauri)](https://tauri.app/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[⬆ Back to top](#loommd)
+
+</div>
