@@ -10,6 +10,7 @@ import { saveFile, newFile, openFile } from "../file-operations";
 import { openFolder, toggleSidebar } from "../file-tree/file-tree";
 import { switchTheme, importTheme, getAvailableThemes } from "../settings/theme";
 import { state } from "../core/state";
+import { exportToHTML, exportToPDF } from "../export/export";
 
 /**
  * Get the main application window
@@ -217,6 +218,21 @@ export function initWindowControls() {
     .getElementById("file-menu-save-file")
     ?.addEventListener("click", async () => {
       await saveFile();
+      fileMenu?.classList.add("hidden");
+    });
+
+  // Export menu items
+  document
+    .getElementById("file-menu-export-html")
+    ?.addEventListener("click", async () => {
+      await exportToHTML();
+      fileMenu?.classList.add("hidden");
+    });
+
+  document
+    .getElementById("file-menu-export-pdf")
+    ?.addEventListener("click", async () => {
+      await exportToPDF();
       fileMenu?.classList.add("hidden");
     });
 

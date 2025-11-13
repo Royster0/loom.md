@@ -6,7 +6,6 @@
 import { editor, editModeToggle, editorContainer } from "../core/dom";
 import { state } from "../core/state";
 import { renderAllLines, getAllLines, renderMarkdownLine } from "./rendering";
-import { updateCursorPosition } from "../ui/ui";
 import { saveFile } from "../file-operations";
 import { closeActiveTab } from "../tabs/tabs";
 import { getFirstTextNode } from "./editor-utils";

@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import { refreshAndRevealFile, refreshFileTree } from "./file-tree-core";
 import { loadFileContent, newFile } from "../file-operations";
-import { getFilename, getPathSeparator, joinPath } from "../utils/path-utils";
+import { getFilename, joinPath } from "../utils/path-utils";
 
 interface ContextMenuItem {
   label: string;
