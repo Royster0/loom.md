@@ -1,12 +1,14 @@
 mod markdown;
 mod config;
 mod file_watcher;
+mod search;
 
 use markdown::{render_markdown_line, LineRenderResult, RenderRequest};
 use config::{ThemeConfig, AppConfig, initialize_loom_dir, load_app_config, save_app_config,
              load_theme, list_themes, import_theme, export_theme, get_loom_dir,
              get_default_dark_theme_config, get_default_light_theme_config};
 use file_watcher::{FileWatcherStateHandle, create_watcher_state};
+use search::{search_in_content, replace_in_content, search_in_directory};
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -630,6 +632,9 @@ pub fn run() {
             get_available_themes,
             import_custom_theme,
             export_custom_theme,
+            search_in_content,
+            replace_in_content,
+            search_in_directory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

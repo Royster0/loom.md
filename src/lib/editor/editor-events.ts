@@ -6,7 +6,7 @@
 import { editor, editModeToggle, editorContainer } from "../core/dom";
 import { state } from "../core/state";
 import { renderAllLines, getAllLines, renderMarkdownLine } from "./rendering";
-import { updateCursorPosition, getCurrentLineNumber } from "../ui/ui";
+import { updateCursorPosition } from "../ui/ui";
 import { saveFile } from "../file-operations";
 import { closeActiveTab } from "../tabs/tabs";
 import { getFirstTextNode } from "./editor-utils";
@@ -15,6 +15,7 @@ import { handleImagePaste, handleImageDrop } from "./image-handling";
 import { handleTextPaste } from "./text-paste";
 import { handleCursorChange } from "./cursor-management";
 import { handleInput } from "./editor-input";
+import { toggleSearchModal } from "../search";
 
 // Re-export for other modules
 export { handleCursorChange } from "./cursor-management";
@@ -283,6 +284,18 @@ export function initEditorEvents() {
     if ((e.ctrlKey || e.metaKey) && e.key === "w") {
       e.preventDefault();
       await closeActiveTab();
+    }
+
+    // Ctrl/Cmd + F to search
+    if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      e.preventDefault();
+      toggleSearchModal(false);
+    }
+
+    // Ctrl/Cmd + H to search and replace
+    if ((e.ctrlKey || e.metaKey) && e.key === "h") {
+      e.preventDefault();
+      toggleSearchModal(true);
     }
   });
 
