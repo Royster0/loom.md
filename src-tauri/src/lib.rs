@@ -2,6 +2,7 @@ mod markdown;
 mod config;
 mod file_watcher;
 mod search;
+mod global_config;
 
 use markdown::{render_markdown_line, LineRenderResult, RenderRequest};
 use config::{ThemeConfig, AppConfig, initialize_loom_dir, load_app_config, save_app_config,
@@ -9,6 +10,7 @@ use config::{ThemeConfig, AppConfig, initialize_loom_dir, load_app_config, save_
              get_default_dark_theme_config, get_default_light_theme_config};
 use file_watcher::{FileWatcherStateHandle, create_watcher_state};
 use search::{search_in_content, replace_in_content, search_in_directory};
+use global_config::{GlobalConfig, load_global_config, save_global_config};
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -596,6 +598,21 @@ fn export_custom_theme(folder_path: Option<String>, theme_name: String, dest_pat
     export_theme(folder_path, theme_name, dest_path)
 }
 
+/// Get the last opened folder from global config
+#[tauri::command]
+fn get_last_opened_folder(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
+    let config = load_global_config(&app_handle)?;
+    Ok(config.last_opened_folder)
+}
+
+/// Save the last opened folder to global config
+#[tauri::command]
+fn save_last_opened_folder(app_handle: tauri::AppHandle, folder_path: String) -> Result<(), String> {
+    let mut config = load_global_config(&app_handle).unwrap_or_default();
+    config.last_opened_folder = Some(folder_path);
+    save_global_config(&app_handle, &config)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -632,6 +649,8 @@ pub fn run() {
             get_available_themes,
             import_custom_theme,
             export_custom_theme,
+            get_last_opened_folder,
+            save_last_opened_folder,
             search_in_content,
             replace_in_content,
             search_in_directory,

@@ -52,7 +52,7 @@ async function setupFileSystemListener() {
 /**
  * Start watching the current folder for file system changes
  */
-async function startWatchingFolder(folderPath: string) {
+export async function startWatchingFolder(folderPath: string) {
   try {
     // Stop watching any previous folder first
     await stopWatchingFolder();
@@ -120,6 +120,8 @@ export async function openFolder() {
       await reinitializeThemeForFolder();
       // Reinitialize settings for the new folder
       await reinitializeSettingsForFolder();
+      // Save the last opened folder
+      await saveLastOpenedFolder(selected);
       // Hide welcome screen since folder is now loaded
       hideWelcomeScreen();
       // Show the sidebar when folder is opened
@@ -277,5 +279,29 @@ export function selectTreeItem(path: string) {
     item.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } else {
     console.warn("Could not find tree item to select:", path);
+  }
+}
+
+/**
+ * Save the last opened folder to global config
+ */
+export async function saveLastOpenedFolder(folderPath: string) {
+  try {
+    await invoke("save_last_opened_folder", { folderPath });
+  } catch (error) {
+    console.error("Error saving last opened folder:", error);
+  }
+}
+
+/**
+ * Get the last opened folder from global config
+ */
+export async function getLastOpenedFolder(): Promise<string | null> {
+  try {
+    const result = await invoke<string | null>("get_last_opened_folder");
+    return result;
+  } catch (error) {
+    console.error("Error getting last opened folder:", error);
+    return null;
   }
 }

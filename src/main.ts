@@ -12,11 +12,52 @@ import { initEditorEvents } from "./lib/editor/editor";
 import { initWindowControls } from "./lib/ui/window-controls";
 import { initializeTheme } from "./lib/settings/theme";
 import { initializeSettings } from "./lib/settings/settings";
-import { initFileTree } from "./lib/file-tree/file-tree";
+import { initFileTree, getLastOpenedFolder, loadFileTree, startWatchingFolder, updateExplorerHeader } from "./lib/file-tree/file-tree";
 import { initWelcomeScreen, hideWelcomeScreen } from "./lib/ui/welcome-screen";
 import { initTabs, openInTab, closeTab, getTabs } from "./lib/tabs/tabs";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { createSearchModal } from "./lib/search";
+import { reinitializeThemeForFolder } from "./lib/settings/theme";
+import { reinitializeSettingsForFolder } from "./lib/settings/settings";
+import { sidebar } from "./lib/core/dom";
+
+/**
+ * Restore the last opened folder if available
+ */
+async function restoreLastOpenedFolder(): Promise<boolean> {
+  try {
+    const lastFolder = await getLastOpenedFolder();
+
+    if (lastFolder) {
+      // Set the current folder
+      state.currentFolder = lastFolder;
+
+      // Update the explorer header with the folder name
+      updateExplorerHeader();
+
+      // Load the file tree
+      await loadFileTree(lastFolder);
+
+      // Start watching the folder for file system changes
+      await startWatchingFolder(lastFolder);
+
+      // Reinitialize theme and settings for the folder
+      await reinitializeThemeForFolder();
+      await reinitializeSettingsForFolder();
+
+      // Show the sidebar
+      state.sidebarVisible = true;
+      sidebar.classList.remove("collapsed");
+
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error restoring last opened folder:", error);
+    return false;
+  }
+}
 
 /**
  * Check if a file path was passed via URL parameters and open it
@@ -67,6 +108,10 @@ async function initialize() {
   initEditorEvents();
   initWindowControls();
   initFileTree();
+
+  // Restore the last opened folder before showing the welcome screen
+  await restoreLastOpenedFolder();
+
   initWelcomeScreen();
   createSearchModal();
 

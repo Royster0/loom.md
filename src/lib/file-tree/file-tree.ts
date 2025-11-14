@@ -4,6 +4,6 @@
  */
 
 // Re-export for backward compatibility
-export { openFolder, loadFileTree, refreshFileTree, refreshAndRevealFile, updateExplorerHeader, expandAndRevealPath, findTreeItemByPath, selectTreeItem, expandedFolders } from "./file-tree-core";
+export { openFolder, loadFileTree, refreshFileTree, refreshAndRevealFile, updateExplorerHeader, expandAndRevealPath, findTreeItemByPath, selectTreeItem, expandedFolders, saveLastOpenedFolder, getLastOpenedFolder, startWatchingFolder } from "./file-tree-core";
 export { renderFileTree, createTreeItem, initFileTree } from "./file-tree-ui";
 export { toggleSidebar, initSidebarResize } from "./sidebar";

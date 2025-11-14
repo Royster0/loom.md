@@ -4,7 +4,7 @@
  */
 
 import { state } from "../core/state";
-import { openFolder, refreshFileTree } from "../file-tree/file-tree";
+import { openFolder, refreshFileTree, saveLastOpenedFolder } from "../file-tree/file-tree";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { explorerHeader, sidebar } from "../core/dom";
@@ -59,6 +59,9 @@ async function createFolderInLocation() {
     await refreshFileTree();
     await reinitializeThemeForFolder();
     await reinitializeSettingsForFolder();
+
+    // Save the last opened folder
+    await saveLastOpenedFolder(newFolderPath);
 
     // Update explorer header
     const folderName_display = newFolderPath.split(/[\\/]/).pop() || "EXPLORER";
